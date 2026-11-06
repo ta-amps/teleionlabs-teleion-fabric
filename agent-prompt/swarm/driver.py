@@ -28,7 +28,7 @@ def cfg(d, bot):
     (d/'opencode.json').write_text(json.dumps({"provider": {prov: {"npm": "@ai-sdk/openai-compatible", "name": prov, "options": {"baseURL": f"http://127.0.0.1:8911/b/{bot}/{A.round}/{prov}/v1", "apiKey": "held-by-proxy"}, "models": {model: {"name": model, "tool_call": True}}}}}))
 def run_once(bot, k):
     d = D/'clean'/A.round/f'{bot}-{k}'; shutil.rmtree(d, ignore_errors=True); cfg(d, bot)
-    prompt = (re.findall(r'```text\n(.*?)```', (D.parent/'PROMPT.md').read_text(), re.S)[1] if A.short else MAIN).replace('YOUR ID: grok-01', f'YOUR ID: {bot}', 1); assert bot in prompt
+    prompt = (re.findall(r'```text\n(.*?)```', (D.parent/'PROMPT.md').read_text(), re.S)[1] if A.short else MAIN).replace('YOUR ID: worker-01', f'YOUR ID: {bot}', 1); assert bot in prompt
     t = D/'transcripts'/f'{A.round}-{bot}-{k}.jsonl'; t0 = time.time(); ts = datetime.datetime.now(datetime.UTC).isoformat(); code = None
     with open(t, 'w') as o, open(str(t)+'.err', 'w') as e:
         cmd = ['opencode.exe', 'run', '--standalone', '--auto', '--format', 'json', '-m', A.model, prompt] if A.harness == 'opencode' else ['codex', 'exec', '--skip-git-repo-check', '--dangerously-bypass-approvals-and-sandbox', '--json', prompt]

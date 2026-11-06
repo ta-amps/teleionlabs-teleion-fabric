@@ -7,12 +7,9 @@
     },
     "tessera-remote": {
       "type": "http",
-      "url": "https://tessera.ta-amps.workers.dev/mcp",
-      "headers": {
-        "Authorization": "Bearer <SCOPED_KEY>"
-      },
+      "url": "https://fabric.teleionlabs.com/mcp",
       "disabled": true,
-      "description": "Shared Tessera task and task-object engine (enable after setting a scoped worker key)"
+      "description": "Teleion Fabric: shared Tasks and Task Objects. No key is needed through December 31, 2026. A scoped worker key gives access to private queues."
     }
   }
 }

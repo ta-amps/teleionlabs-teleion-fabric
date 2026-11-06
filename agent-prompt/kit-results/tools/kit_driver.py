@@ -18,7 +18,7 @@ def run(i):
     d = S/'clean'/A.round/f'{bot}-1'; shutil.rmtree(d, ignore_errors=True); (d/'.home').mkdir(parents=True)
     prov, model = A.model.split('/', 1)
     (d/'opencode.json').write_text(json.dumps({"provider": {prov: {"npm": "@ai-sdk/openai-compatible", "name": prov, "options": {"baseURL": f"http://127.0.0.1:{A.port}/b/{bot}/{A.round}/{prov}/v1", "apiKey": "held-by-proxy"}, "models": {model: {"name": model, "tool_call": True}}}}}))
-    prompt = MAIN.replace('YOUR ID: grok-01', f'YOUR ID: {bot}', 1); assert bot in prompt
+    prompt = MAIN.replace('YOUR ID: worker-01', f'YOUR ID: {bot}', 1); assert bot in prompt
     t = S/'transcripts'/f'{A.round}-{bot}-1.jsonl'; t0 = time.time(); ts = datetime.datetime.now(datetime.UTC).isoformat()
     with open(t, 'w') as o, open(str(t)+'.err', 'w') as e:
         p = subprocess.Popen([str(S/'sandbox.sh'), str(d), 'opencode.exe', 'run', '--standalone', '--auto', '--format', 'json', '-m', A.model, prompt], stdin=subprocess.DEVNULL, stdout=o, stderr=e, start_new_session=True)

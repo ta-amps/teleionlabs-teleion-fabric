@@ -18,10 +18,10 @@ run_cmd() {
   fi
 }
 
-echo "=== Step 1: Deploy Tessera Work & CAS Engine ==="
+echo "=== Step 1: Deploy the Teleion Fabric work and storage engine ==="
 run_cmd npx --prefix "$TESSERA_DIR" wrangler deploy
 
-echo "=== Step 2: Deploy Herma Context Shim ==="
+echo "=== Step 2: Deploy the Teleion Fabric model shim ==="
 run_cmd npx --prefix "$HERMA_DIR" wrangler deploy
 
 echo "=== Step 3: Deploy Agora Static Hub to Cloudflare Pages ==="

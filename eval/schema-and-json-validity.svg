@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 372" role="img" aria-labelledby="val-title val-desc">
   <title id="val-title">Muse Glimmer 30B JSON Validity and Refusal Recall Before and After PEFT QLoRA Tuning</title>
-  <desc id="val-desc">Muse Glimmer 30B before and after PEFT QLoRA tuning on unseen Tessera MCP tool-call holdout splits: JSON validity rises from 96.7% to 100.0%; refusal recall on the frozen split (30 refusal cases) rises from 53.3% to 100.0%; refusal recall on the fresh holdout (26 refusal cases) rises from 84.6% to 100.0%.</desc>
+  <desc id="val-desc">Muse Glimmer 30B before and after PEFT QLoRA tuning on unseen Teleion Fabric MCP tool-call holdout splits: JSON validity rises from 96.7% to 100.0%; refusal recall on the frozen split (30 refusal cases) rises from 53.3% to 100.0%; refusal recall on the fresh holdout (26 refusal cases) rises from 84.6% to 100.0%.</desc>
   <rect width="860" height="372" rx="12" fill="#fbfaf7"/>
   <rect x="1" y="1" width="858" height="370" rx="11" fill="none" stroke="#d8d3c8" stroke-width="1.5"/>
 

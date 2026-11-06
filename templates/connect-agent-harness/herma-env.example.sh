@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Example environment setup for connecting Muse Code, OpenCode, or Pi via Herma.
+# Example environment setup for connecting Muse Code, OpenCode or Pi through the Teleion Fabric model shim.
+# The HERMA_* variable names are kept for existing scripts.
 # Source in your shell after substituting your own local or Standard-tier endpoint.
 # Defaults: the Meta API (Standard tier) and Muse Spark 1.3. Keep the API key in your shell keychain, not here.
 

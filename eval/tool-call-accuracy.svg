@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 304" role="img" aria-labelledby="acc-title acc-desc">
   <title id="acc-title">Strict Exact-Match Accuracy Before and After PEFT QLoRA Fine-Tuning of Muse Glimmer 30B</title>
-  <desc id="acc-desc">Comparison of the unchanged Muse Glimmer 30B base model versus its PEFT QLoRA specialist adapter on unseen Tessera MCP tool-call holdout splits (n=150 per split): the frozen test rises from 87.3% to 98.7%, and the pre-registered fresh holdout rises from 93.3% to 99.3%.</desc>
+  <desc id="acc-desc">Comparison of the unchanged Muse Glimmer 30B base model versus its PEFT QLoRA specialist adapter on unseen Teleion Fabric MCP tool-call holdout splits (n=150 per split): the frozen test rises from 87.3% to 98.7%, and the pre-registered fresh holdout rises from 93.3% to 99.3%.</desc>
   <rect width="860" height="304" rx="12" fill="#fbfaf7"/>
   <rect x="1" y="1" width="858" height="302" rx="11" fill="none" stroke="#d8d3c8" stroke-width="1.5"/>
 
   <text x="32" y="40" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="19" font-weight="700" fill="#181816">Typed Tool-Call Exact Match on Unseen Holdout Splits (n = 150 each)</text>
-  <text x="32" y="64" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="13" fill="#525049">Made-up Tessera MCP specialist task -- proves continuous Task/Task-Object loop mechanics, not general capability</text>
+  <text x="32" y="64" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="13" fill="#525049">Made-up Teleion Fabric MCP specialist task. It shows the Task and Task Object loop, not general capability.</text>
 
   <!-- Legend -->
   <rect x="32" y="82" width="14" height="14" rx="3" fill="#9a9488"/>
