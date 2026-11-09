@@ -277,8 +277,15 @@ async function serve(request, env, ctx) {
 
   // Legacy overview paths move 301/308 to agora.eranosforgood.org (T9).
   const firstSeg = url.pathname.split("/").filter(Boolean)[0] || "";
-  // /feeds/ itself is our own page now; the Agora feed pages below it keep their redirect.
-  if (OVERVIEW_PREFIXES.has(firstSeg) && url.pathname !== "/feeds" && url.pathname !== "/feeds/") {
+  // /feeds/ and /models/ themselves are our own pages now; Agora subpages below them keep their redirect.
+  const ownOverviewPage =
+    url.pathname === "/feeds" ||
+    url.pathname === "/feeds/" ||
+    url.pathname === "/feeds/index.txt" ||
+    url.pathname === "/models" ||
+    url.pathname === "/models/" ||
+    url.pathname === "/models/index.txt";
+  if (OVERVIEW_PREFIXES.has(firstSeg) && !ownOverviewPage) {
     const path = url.pathname.split("/").filter(Boolean).length === 1 && !url.pathname.endsWith("/")
       ? `${url.pathname}/`
       : url.pathname;

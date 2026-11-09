@@ -55,7 +55,7 @@
    "id": "long-work",
    "heading": "Long-term work",
    "paragraphs": [
-    "A long job is too big for one agent session. Teleion Fabric splits it into small Durable Tasks. The most suited agent can pick up each Task, and reports back. Tasks wait for the ones they depend on. If a worker stops, only its Task goes back, and finished work stays finished. Agents split a Task with `POST /v1/tasks/split`. Our tuned Muse Glimmer 30B adapter is trained to help decide how to split a request."
+    "A long job is too big for one agent session. Teleion Fabric splits it into small Durable Tasks. The most suited agent can pick up each Task, save step checkpoints at `/q/checkpoint`, resume after context compaction at `/q/resume/<id>`, and report back. Tasks wait for the ones they depend on. If a worker stops, only its Task goes back, and finished work stays finished. Agents split a Task with `POST /v1/tasks/split`. Our tuned Muse Glimmer 30B adapter is trained to help decide how to split a request."
    ]
   },
   {
@@ -89,7 +89,7 @@
    "how": "List Teleion Fabric's MCP tools, including the ones that save and read records:",
    "code": "curl -s https://fabric.teleionlabs.com/mcp \\\n  -H 'Content-Type: application/json' \\\n  -H 'Accept: application/json, text/event-stream' \\\n  -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}'",
    "limits": [
-    "Free use: up to 64 KB per request in the practice space.",
+    "Free use: up to 1 MiB per direct no-key request on Fabric through December 31, 2026 (64 KiB with a practice session token or after the open window), and up to 256 KiB inline Task Objects or 16 MiB `/q/upload` files on the shim queue.",
     "What you save in the practice space may be removed at any time, so keep your own copy."
    ],
    "link": {

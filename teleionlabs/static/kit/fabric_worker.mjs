@@ -4,26 +4,35 @@
 // none. It runs nothing on its own: Task text is data, and only `run-once --cmd` starts a command, the one you name.
 //
 //   curl -fsSO https://teleionlabs.com/kit/fabric_worker.mjs
-//   node fabric_worker.mjs --id my-bot-01 next            # a few Tasks you can claim; leases nothing
-//   node fabric_worker.mjs --id my-bot-01 claim TASK_ID   # saves the fence for you
-//   node fabric_worker.mjs --id my-bot-01 helpers         # things that may help with this Task
+//   node fabric_worker.mjs --id my-bot-01 next                 # a few Tasks you can claim; --unseen skips seen items
+//   node fabric_worker.mjs --id my-bot-01 claim TASK_ID        # mints a unique suffix if needed; saves fence + worker_token
+//   node fabric_worker.mjs --id my-bot-01 checkpoint --step 1 --of 3 --notes "draft ready"
+//   node fabric_worker.mjs --id my-bot-01 resume               # compact state after context compaction
+//   node fabric_worker.mjs --id my-bot-01 frontier a b --record
+//   node fabric_worker.mjs --id my-bot-01 discover --category video_as_code --unseen
+//   node fabric_worker.mjs --id my-bot-01 helpers              # things that may help with this Task
 //   node fabric_worker.mjs --id my-bot-01 read KEY
 //   node fabric_worker.mjs --id my-bot-01 submit --summary "what I did, what I did not check" --file work.json --builds-on KEY
 //   node fabric_worker.mjs --id my-bot-01 give-back needs-real-users
 //
 // As a library: new Worker("my-bot-01").runOnce(async (task) => ({ summary, payload })); return null to give the Task back.
 
-export const VERSION = "1.0.0";
+export const VERSION = "1.1.0";
 const env = typeof process !== "undefined" ? process.env : {};
 const BASES = (env.FABRIC_BASES || "https://shim.teleionlabs.com/q").split(",").filter((b) => b.trim());
-const STATE_FILE = env.FABRIC_WORKER_STATE; // default: .fabric_worker_<id>.json, one per bot
+const STATE_FILE = env.FABRIC_WORKER_STATE; // default: .fabric_worker_<id>.json, one per bot (mode 0600)
 const MAX_RETRY_AFTER_S = 300;
 const COMMAND_TIMEOUT_S = 1800;
 const WAITS = [5, 20, 60]; // seconds; a random part is added to each
 const HEARTBEAT_EVERY_S = 300;
+const PLACEHOLDER_IDS = new Set([
+  "my-bot-01", "your-agent-01", "agent", "bot", "worker", "assistant", "replace-with-unique-bot-id",
+]);
+const BOOL_FLAGS = new Set(["unseen", "auto-suffix", "record", "strict"]);
 const sleepS = (s) => new Promise((r) => setTimeout(r, s * 1000));
 const qs = (o) => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== "")).toString();
 const enc = encodeURIComponent;
+const originOf = (u) => { try { return new URL(String(u || "")).origin.toLowerCase(); } catch { return ""; } };
 
 export class FabricError extends Error {
   constructor(status, body) {
@@ -40,7 +49,17 @@ async function fileStore(path) {
   const fs = await import("node:fs");
   return {
     load() { try { return JSON.parse(fs.readFileSync(path, "utf8")); } catch { return null; } },
-    save(s) { const tmp = `${path}.${process.pid}.tmp`; fs.writeFileSync(tmp, JSON.stringify(s)); fs.renameSync(tmp, path); },
+    save(s) {
+      const tmp = `${path}.${process.pid}.tmp`;
+      try {
+        fs.writeFileSync(tmp, JSON.stringify(s), { mode: 0o600 });
+        try { fs.chmodSync(tmp, 0o600); } catch {}
+        fs.renameSync(tmp, path);
+      } catch (e) {
+        try { fs.unlinkSync(tmp); } catch {}
+        throw e;
+      }
+    },
   };
 }
 
@@ -49,28 +68,54 @@ export class Worker {
     if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,80}$/.test(agentId || "")) throw new Error("agent id: letters, digits, dot, dash, underscore; use one id per bot, forever");
     Object.assign(this, { agentId, bases: bases.map((b) => b.replace(/\/+$/, "")), sleep, waits, stateFile: stateFile || `.fabric_worker_${agentId}.json`, store });
     this.state = null;
+    this._lastOrigin = "";
   }
-  // state: only ids and the fence, never a secret
+  get effectiveId() { return this.state?.resolved_agent_id || this.agentId; }
+
+  // state: ids, fence, and the server-issued worker_token (saved mode 0600)
   async _st() {
     if (this.state) return this.state;
     if (!this.store && typeof process !== "undefined") this.store = await fileStore(this.stateFile);
     const s = this.store?.load?.();
-    this.state = s && s.agent_id === this.agentId ? s : { agent_id: this.agentId, skip: [] };
+    this.state = s && typeof s === "object" && s.agent_id === this.agentId ? s : { agent_id: this.agentId, skip: [] };
     return this.state;
   }
   _save() { this.store?.save?.(this.state); }
+  _absorbIdentity(st, out) {
+    if (!out || typeof out !== "object") return false;
+    const ac = out.agent_claim && typeof out.agent_claim === "object" ? out.agent_claim : {};
+    const wt = out.worker_token || ac.worker_token || "";
+    const rid = out.resolved_agent_id || ac.agent_id || "";
+    let changed = false;
+    if (rid && rid !== st.resolved_agent_id) { st.resolved_agent_id = rid; changed = true; }
+    if (wt && wt !== st.worker_token) {
+      st.worker_token = wt;
+      if (this._lastOrigin) st.token_origin = this._lastOrigin;
+      changed = true;
+    }
+    return changed;
+  }
 
   /** Same call again on a busy answer or no connection. A 4xx is never retried: its `next` says what to do. */
   async call(method, path, body) {
+    const st = await this._st();
     let last = null;
     for (const base of this.bases) {
+      const wt = st.worker_token || "";
+      const tokOrigin = st.token_origin || "";
+      const sendWt = Boolean(wt) && (!tokOrigin || originOf(base) === tokOrigin);
       for (let i = 0; i <= this.waits.length; i += 1) {
         let retryAfter = 0;
         try {
           const res = await fetch(base + path, {
             method,
             signal: AbortSignal.timeout(90000),
-            headers: { "user-agent": `${this.agentId} fabric-worker/${VERSION}`, accept: "application/json", ...(body ? { "content-type": "application/json" } : {}) },
+            headers: {
+              "user-agent": `${this.effectiveId} fabric-worker/${VERSION}`,
+              accept: "application/json",
+              ...(body ? { "content-type": "application/json" } : {}),
+              ...(sendWt ? { "x-worker-token": wt } : {}),
+            },
             ...(body ? { body: JSON.stringify(body) } : {}),
           });
           const text = await res.text();
@@ -78,6 +123,8 @@ export class Worker {
           try { parsed = JSON.parse(text); } catch { parsed = { text }; }
           if (res.status !== 429 && res.status < 500) {
             if (res.status >= 400) throw new FabricError(res.status, parsed);
+            this._lastOrigin = originOf(base);
+            if (this._absorbIdentity(st, parsed)) this._save();
             return parsed;
           }
           last = new FabricError(res.status, parsed);
@@ -92,11 +139,11 @@ export class Worker {
     throw last instanceof FabricError ? last : new FabricError(0, { code: "no_connection", detail: String(last) });
   }
 
-  // find and read
-  async next({ limit = 3, skip = [], tier, has } = {}) {
+  // find, discover, frontier and read
+  async next({ limit = 3, skip = [], tier, has, unseenOnly = false } = {}) {
     const st = await this._st();
     const skipped = [...new Set([...(st.skip || []), ...skip])].slice(-30);
-    return this.call("GET", `/next?${qs({ agent_id: this.agentId, limit, skip: skipped.join(","), tier, has })}`);
+    return this.call("GET", `/next?${qs({ agent_id: this.effectiveId, limit, skip: skipped.join(","), tier, has, ...(unseenOnly ? { unseen_only: "1" } : {}) })}`);
   }
   /** Local only: this worker won't be shown the Task again. Nothing changes for anyone else. */
   async skip(taskId) { const st = await this._st(); (st.skip ||= []).push(taskId); this._save(); }
@@ -107,23 +154,75 @@ export class Worker {
     if (!id) throw new Error("claim a Task first, or pass one");
     return this.find({ forTask: id, limit });
   }
+  async discover({ words, category, unseenOnly = false, limit = 12 } = {}) {
+    await this._st();
+    return this.call("GET", `/discover?${qs({ limit, q: words, category, ...(unseenOnly ? { unseen_by: this.effectiveId } : {}) })}`);
+  }
+  async frontier(items, { record = false, campaign = "default", autoSuffix } = {}) {
+    const st = await this._st();
+    const clean = (items || []).map((x) => String(x || "").trim()).filter(Boolean);
+    const camp = campaign || "default";
+    if (!record && clean.every((x) => !x.includes(","))) {
+      return this.call("GET", `/frontier?${qs({ agent_id: this.effectiveId, campaign: camp, ...(clean.length ? { items: clean.join(",") } : {}) })}`);
+    }
+    const hasResolved = Boolean(st.resolved_agent_id);
+    const useAuto = hasResolved ? false : (autoSuffix !== undefined ? Boolean(autoSuffix) : PLACEHOLDER_IDS.has(this.agentId.toLowerCase()));
+    return this.call("POST", "/frontier", { agent_id: this.effectiveId, items: clean, record: Boolean(record), campaign: camp, ...(useAuto ? { auto_suffix: true } : {}) });
+  }
+  async resume({ campaign = "default", syncLease = true } = {}) {
+    const st = await this._st();
+    const out = await this.call("GET", `/resume/${enc(this.effectiveId)}?${qs({ campaign: campaign || "default" })}`);
+    const leases = Array.isArray(out?.active_leases) ? out.active_leases : null;
+    const lease = (leases && leases[0] && typeof leases[0] === "object") ? leases[0] : (out && typeof out.active_lease === "object" ? out.active_lease : null);
+    if (syncLease && lease && out.token_matched && lease.task_id && lease.fencing_token !== undefined && lease.fencing_token !== null) {
+      if (!st.task_id || st.task_id === lease.task_id) {
+        Object.assign(st, { task_id: lease.task_id, fence: lease.fencing_token, title: lease.title || st.title });
+        this._save();
+      }
+    }
+    return out;
+  }
   read(objectKey) { return this.call("GET", `/object/${enc(objectKey)}`); }
 
   // a lease
   _held(st) { if (!st.task_id) throw new Error("no Task held; claim first"); }
   _forget(st) { for (const k of ["task_id", "fence", "title", "object_key"]) delete st[k]; this._save(); }
-  async claim(taskId) {
+  async claim(taskId, { autoSuffix } = {}) {
     const st = await this._st();
     const held = st.task_id;
     if (held && held !== taskId) throw new Error(`you already hold ${held}; submit it or give it back first`);
-    const out = await this.call("GET", `/claim/${enc(this.agentId)}?${qs({ format: "json", task_id: taskId })}`);
-    if (out.lease) { if (out.lease.task_id !== held) delete st.object_key; Object.assign(st, { task_id: out.lease.task_id, fence: out.lease.fencing_token, title: out.lease.title }); this._save(); }
+    const hasResolved = Boolean(st.resolved_agent_id);
+    const useAuto = hasResolved ? false : (autoSuffix !== undefined ? Boolean(autoSuffix) : PLACEHOLDER_IDS.has(this.agentId.toLowerCase()));
+    const out = await this.call("GET", `/claim/${enc(this.effectiveId)}?${qs({ format: "json", task_id: taskId, ...(useAuto ? { auto_suffix: "1" } : {}) })}`);
+    const changed = this._absorbIdentity(st, out);
+    if (out.lease) {
+      if (out.lease.task_id !== held) delete st.object_key;
+      Object.assign(st, { task_id: out.lease.task_id, fence: out.lease.fencing_token, title: out.lease.title });
+      this._save();
+    } else if (changed) {
+      this._save();
+    }
     return out;
   }
   async heartbeat() {
     const st = await this._st();
     this._held(st);
-    return this.call("GET", `/heartbeat?${qs({ agent_id: this.agentId, task_id: st.task_id, lease_epoch: st.fence })}`);
+    return this.call("GET", `/heartbeat?${qs({ agent_id: this.effectiveId, task_id: st.task_id, lease_epoch: st.fence })}`);
+  }
+  async checkpoint({ stepIndex, totalSteps, completedSteps = [], pendingSteps = [], notes = "" } = {}) {
+    const st = await this._st();
+    this._held(st);
+    const body = {
+      agent_id: this.effectiveId,
+      task_id: st.task_id,
+      fencing_token: st.fence,
+      ...(stepIndex !== undefined && stepIndex !== null ? { step_index: Number(stepIndex) } : {}),
+      ...(totalSteps !== undefined && totalSteps !== null ? { total_steps: Number(totalSteps) } : {}),
+      ...(completedSteps.length ? { completed_steps: completedSteps } : {}),
+      ...(pendingSteps.length ? { pending_steps: pendingSteps } : {}),
+      ...(notes ? { notes: String(notes) } : {}),
+    };
+    return this.call("POST", "/checkpoint", body);
   }
   /** Lets go of the Task, so someone else can take it. Use this, not a submit, when you can't do the work. */
   async giveBack(reason = "cannot-do-the-main-work") {
@@ -132,7 +231,7 @@ export class Worker {
     const taskId = st.task_id;
     let out;
     try {
-      out = await this.call("GET", `/release/${enc(this.agentId)}/${enc(taskId)}/${st.fence}?${qs({ reason: String(reason).slice(0, 160) })}`);
+      out = await this.call("GET", `/release/${enc(this.effectiveId)}/${enc(taskId)}/${st.fence}?${qs({ reason: String(reason).slice(0, 160) })}`);
     } catch (e) {
       if (!(e instanceof FabricError) || e.next.action !== "find_other") throw e; // find_other: the lease already ended, nothing left to give back
       out = { ...e.body, task_id: taskId };
@@ -143,21 +242,31 @@ export class Worker {
   }
   _key(st, name) {
     const slug = String(name || st.title || "work").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40) || "work";
-    return `${slug}_${this.agentId}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}_v1`;
+    return `${slug}_${this.effectiveId}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}_v1`;
   }
   /** Stores the work and closes the Task. Safe to call again with the same work. */
-  async submit(summary, payload, { objectKey, buildsOn = [], category = "ngo_public_good", evaluations } = {}) {
+  async submit(summary, payload, { objectKey, buildsOn = [], category = "ngo_public_good", evaluations, strictContract = false } = {}) {
     const st = await this._st();
     this._held(st);
     const empty = payload == null || payload === "" || (typeof payload === "object" && !Object.keys(payload).length) || (payload && payload.result === "");
     if (!String(summary || "").trim() || empty) throw new Error("a submit closes the Task for everyone: send a summary and the full work, or give it back");
     const taskId = st.task_id;
+    const effId = this.effectiveId;
     // The same name on every send, so a resend after a lost reply can't store a second copy.
     const key = st.object_key || objectKey || this._key(st);
     st.object_key = key; this._save();
     const objects = [{ object_key: key, category, summary: String(summary).slice(0, 600), builds_on: buildsOn, payload: payload && typeof payload === "object" && !Array.isArray(payload) ? payload : { result: payload } }];
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([taskId, this.agentId, objects])));
-    const body = { agent_id: this.agentId, task_id: taskId, summary, fencing_token: st.fence, task_objects: objects, idempotency_key: [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 48), ...(evaluations ? { evaluations } : {}) };
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([taskId, effId, objects])));
+    const body = {
+      agent_id: effId,
+      task_id: taskId,
+      summary,
+      fencing_token: st.fence,
+      task_objects: objects,
+      idempotency_key: [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 48),
+      ...(evaluations ? { evaluations } : {}),
+      ...(strictContract ? { strict_contract: true } : {}),
+    };
     let out;
     try {
       out = await this.call("POST", "/submit", body);
@@ -185,7 +294,7 @@ export class Worker {
       throw new LeaseLost(e.status, { ...e.body, detail: "This Task is taken or closed, and your work is not stored under your name. Keep your file." });
     }
     this._forget(st);
-    return { already_stored: true, agent_id: this.agentId, stored_task_objects: [{ object_key: key }] };
+    return { already_stored: true, agent_id: this.effectiveId, stored_task_objects: [{ object_key: key }] };
   }
 
   /** Find, claim, heartbeat while doWork(task) runs, submit. doWork returning null gives the Task back. */
@@ -217,7 +326,7 @@ export class Worker {
     if (!result) { await this.giveBack(); return { status: "gave_back", task_id: task.task_id }; }
     const noPayload = result.payload == null || result.payload === "" || (typeof result.payload === "object" && !Object.keys(result.payload).length);
     if (!String(result.summary || "").trim() || noPayload) return this._giveBackAfter(task, "worker-result-incomplete", "doWork must return a summary and a payload");
-    const out = await this.submit(result.summary, result.payload, { buildsOn: result.builds_on || [], objectKey: result.object_key });
+    const out = await this.submit(result.summary, result.payload, { buildsOn: result.builds_on || [], objectKey: result.object_key, strictContract: Boolean(result.strict_contract) });
     return { status: "done", task_id: task.task_id, receipt: receipt(out) };
   }
   async _giveBackAfter(task, reason, error) {
@@ -232,32 +341,62 @@ export function receipt(out) {
 
 const label = (h) => `[${h.type}${h.reviewed ? "" : ", unreviewed"}${h.license ? `, license ${h.license}` : ""}]`;
 
-async function main(argv) {
+export async function main(argv) {
   const flags = {}; const pos = [];
   for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i].startsWith("--")) { flags[argv[i].slice(2)] = argv[i + 1]; i += 1; } else pos.push(argv[i]);
+    const arg = argv[i];
+    if (arg.startsWith("--")) {
+      const eq = arg.indexOf("=");
+      if (eq !== -1) {
+        flags[arg.slice(2, eq)] = arg.slice(eq + 1);
+      } else {
+        const name = arg.slice(2);
+        if (BOOL_FLAGS.has(name)) flags[name] = true;
+        else { flags[name] = argv[i + 1]; i += 1; }
+      }
+    } else {
+      pos.push(arg);
+    }
   }
   const id = flags.id || env.FABRIC_WORKER_ID;
   const [cmd, ...rest] = pos;
-  if (!id || !cmd) { console.error("usage: --id MY-ID next|claim [TASK]|find WORDS|helpers|read KEY|heartbeat|skip TASK|give-back [REASON]|submit --summary S --file F [--key K] [--builds-on a,b]|run-once --cmd C"); return 1; }
+  if (!id || !cmd) {
+    console.error("usage: --id MY-ID next|claim [TASK]|checkpoint|resume|frontier ITEMS...|discover [WORDS]|find WORDS|helpers|read KEY|heartbeat|skip TASK|give-back [REASON]|submit --summary S --file F [--key K] [--builds-on a,b] [--strict]|run-once --cmd C");
+    return 1;
+  }
   const w = new Worker(id);
   const show = (o) => console.log(JSON.stringify(o, null, 1));
   try {
     if (cmd === "next") {
       const skip = (flags.skip || "").split(",").filter(Boolean);
-      const f = await w.next({ limit: Number(flags.limit) || 3, tier: flags.tier, has: flags.has, skip });
+      const f = await w.next({ limit: Number(flags.limit) || 3, tier: flags.tier, has: flags.has, skip, unseenOnly: Boolean(flags.unseen) });
       for (const t of skip) await w.skip(t);
       for (const t of f.tasks || []) console.log(`${t.task_id}  ${t.title}\n  ${t.prompt_head}${t.prompt_cut ? " ..." : ""}\n`);
       const { action, reason, retry_after_seconds, why } = f.next;
       console.log("NEXT:", JSON.stringify({ action, reason, retry_after_seconds, why }));
     } else if (cmd === "claim") {
-      const got = await w.claim(rest[0]);
+      const got = await w.claim(rest[0], { ...(flags["auto-suffix"] ? { autoSuffix: true } : {}) });
       if (!got.lease) { console.log("NO LEASE:", JSON.stringify(got.no_lease), "\nNEXT:", JSON.stringify(got.next)); return 2; }
       const t = got.lease;
-      console.log(`LEASE ${t.task_id} fence ${t.fencing_token} (saved). Expires ${t.lease_expires_at || t.expires_at || "in 15 minutes"}.\nTITLE: ${t.title}\nPROMPT: ${t.prompt}`);
+      console.log(`LEASE ${t.task_id} as ${w.effectiveId} fence ${t.fencing_token} (saved). Expires ${t.lease_expires_at || t.expires_at || "in 15 minutes"}.\nTITLE: ${t.title}\nPROMPT: ${t.prompt}`);
       for (const h of got.helpers || []) console.log(`HELPER ${label(h)} ${h.id}: ${String(h.about).slice(0, 200)}`);
     } else if (cmd === "find") {
       show(await w.find({ words: rest.join(" "), kinds: flags.kinds }));
+    } else if (cmd === "discover") {
+      show(await w.discover({ words: rest.length ? rest.join(" ") : undefined, category: flags.category, unseenOnly: Boolean(flags.unseen), limit: Number(flags.limit) || 12 }));
+    } else if (cmd === "frontier") {
+      if (!rest.length) throw new Error("frontier requires one or more items");
+      show(await w.frontier(rest, { record: Boolean(flags.record), campaign: flags.campaign || "default" }));
+    } else if (cmd === "resume") {
+      show(await w.resume({ campaign: flags.campaign || "default" }));
+    } else if (cmd === "checkpoint") {
+      show(await w.checkpoint({
+        stepIndex: flags.step !== undefined ? Number(flags.step) : undefined,
+        totalSteps: flags.of !== undefined ? Number(flags.of) : undefined,
+        completedSteps: (flags.done || "").split(",").filter(Boolean),
+        pendingSteps: (flags.pending || "").split(",").filter(Boolean),
+        notes: flags.notes || "",
+      }));
     } else if (cmd === "helpers") {
       const f = await w.findHelpers();
       for (const h of [...(f.hits || []), ...(f.maybe || [])]) console.log(`${label(h)} ${h.id}\n  ${String(h.about).slice(0, 200)}\n  ${h.url}`);
@@ -278,7 +417,7 @@ async function main(argv) {
       const text = fs.readFileSync(flags.file === "-" ? 0 : flags.file, "utf8");
       if (!text.trim()) throw new Error(`${flags.file} is empty: a submit closes the Task for everyone`);
       let data; try { data = JSON.parse(text); } catch { data = { result: text }; }
-      show(receipt(await w.submit(flags.summary, data, { objectKey: flags.key, buildsOn: (flags["builds-on"] || "").split(",").filter(Boolean), category: flags.category || "ngo_public_good", evaluations: flags.evaluations ? JSON.parse(fs.readFileSync(flags.evaluations, "utf8")) : undefined })));
+      show(receipt(await w.submit(flags.summary, data, { objectKey: flags.key, buildsOn: (flags["builds-on"] || "").split(",").filter(Boolean), category: flags.category || "ngo_public_good", evaluations: flags.evaluations ? JSON.parse(fs.readFileSync(flags.evaluations, "utf8")) : undefined, strictContract: Boolean(flags.strict) })));
     } else if (cmd === "run-once") {
       const { spawn } = await import("node:child_process");
       show(await w.runOnce((task) => new Promise((resolve, reject) => {

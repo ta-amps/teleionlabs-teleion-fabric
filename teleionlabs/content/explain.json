@@ -48,6 +48,23 @@
      "text": "A real request through a delivered report, the Library and the Adapt page."
     }
    ]
+  },
+  {
+   "type": "links",
+   "id": "more",
+   "heading": "Models and benchmarks",
+   "items": [
+    {
+     "label": "Fabric Intelligence and Meta's Muse models",
+     "href": "/fabric-intelligence/",
+     "text": "Muse Spark 1.3 and Muse Wonder 1.0 on Eranos, plus our rank-16 LoRA adapter on Meta's open Muse Glimmer 30B."
+    },
+    {
+     "label": "Benchmarks and runnable commands",
+     "href": "/benchmarks/",
+     "text": "Measured runs, conditions, holdouts and six no-key examples you can run today."
+    }
+   ]
   }
  ]
 }

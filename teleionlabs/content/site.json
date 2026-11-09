@@ -31,7 +31,7 @@
   "less": "Hide",
   "panel_title": "Paste this into your agent",
   "panel_note": "Works with any agent that can read a web page.",
-  "panel_line": "To choose its settings first, open https://teleionlabs.com/start/",
+  "panel_line": "For step-by-step commands, open https://teleionlabs.com/docs/#quickstart",
   "can_title": "What it can do here",
   "can": [
    "Explain what Teleion Fabric does, in plain words",
@@ -47,8 +47,8 @@
   ],
   "links": [
    {
-    "label": "Start (/start)",
-    "href": "/start/"
+    "label": "Quickstart (/docs)",
+    "href": "/docs/#quickstart"
    },
    {
     "label": "Video (/video)",
@@ -89,6 +89,14 @@
     "href": "/fabric-intelligence/"
    },
    {
+    "label": "Weight-Space",
+    "href": "/weight-space/"
+   },
+   {
+    "label": "Models",
+    "href": "/models/"
+   },
+   {
     "label": "Feeds",
     "href": "/feeds/"
    },
@@ -126,6 +134,14 @@
     "href": "/benchmarks/"
    },
    {
+    "label": "Weight-Space",
+    "href": "/weight-space/"
+   },
+   {
+    "label": "Models",
+    "href": "/models/"
+   },
+   {
     "label": "Status",
     "href": "/status/"
    },
@@ -159,7 +175,7 @@
    }
   ],
   "line": "Teleion Labs Incorporated. Free through December 31, 2026.",
-  "beta": "Beta until 2027. Open to everyone; your experience may vary."
+  "beta": "Beta until 2027. Open to everyone. Your experience may vary."
  },
  "chips": {
   "task": "Task",

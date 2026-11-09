@@ -1,0 +1,232 @@
+{
+ "kind": "task_object",
+ "id": "teleion.instructions/page.weight_space",
+ "version": 6,
+ "updated": "2026-11-09",
+ "route": "/weight-space/",
+ "output": "weight-space/index.html",
+ "title": "Weight-space programming across model types · Teleion Labs",
+ "description": "Weight-space programming from recorded traces across twelve model types, nine portable runtimes, parameterized engine grids, operator discovery, and external benchmarks.",
+ "sources": {
+  "paradigm_credit": "Rikiya Takehi, Jayden Teoh, Alex Zhang and Omar Khattab at MIT CSAIL: https://rikiyat.github.io/blog/weight-space-programming/",
+  "suite": "notes/work-2026-11-08-weight-space-programming-suite/artifacts/weight_space_benchmark_results.json (5 seeds: 11, 23, 37, 53, 71)",
+  "neural_and_pruning": "notes/work-2026-11-08-neural-synthesis-and-model-edit/artifacts/neural_proof_summary.json; notes/work-2026-11-08-quorum-forge-swarm-proxy/artifacts/quorum_forge_summary.json",
+  "adversarial_and_cegar": "notes/work-2026-11-08-adversarial-weight-space-redteam/artifacts/adversarial_redteam_and_cegar_results.json; https://shim.teleionlabs.com/c/adversarial_weight_space_redteam_and_cegar_v1",
+  "nextgen_and_kernels": "notes/work-2026-11-08-nextgen-families-attribution-and-enterprise/artifacts/nextgen_weight_fabric_results.json; notes/work-2026-11-08-kernels-familiarity-oneshot-multishot/artifacts/kernels_familiarity_oneshot_results.json; notes/work-2026-11-08-real-pretrained-safetensors-bench/artifacts/real_pretrained_safetensors_results.json",
+  "portable_and_grid": "https://shim.teleionlabs.com/c/wasm_wgsl_7runtime_and_dp_woodbury_rls_v1; https://shim.teleionlabs.com/c/universal_component_grid_and_weight_bus_v1; https://shim.teleionlabs.com/c/autonomous_operator_discovery_map_elites_v1; https://shim.teleionlabs.com/c/sheaf_conformal_hyperlora_9runtime_v1",
+  "benchmarks_and_competitions": "https://shim.teleionlabs.com/c/seedpack_4115_repo_rebuilds_and_120_benchmarks_v1; https://shim.teleionlabs.com/c/real_120_external_benchmarks_and_kaggle_ab_v1; https://shim.teleionlabs.com/c/subspace_repo_fault_and_casmi26_msms_v1",
+  "controlled_language": "ASD-STE100 Simplified Technical English controlled language standard; notes/work-2026-11-08-asd-ste100-weight-space",
+  "hub": "https://shim.teleionlabs.com/models and https://shim.teleionlabs.com/q/models",
+  "seedpack": "https://shim.teleionlabs.com/c/seedpack_121k_atomic_weight_space_tasks_dfd291_v1"
+ },
+ "blocks": [
+  {
+   "type": "page_head",
+   "eyebrow": "Teleion Fabric",
+   "title": "Weight-space programming from recorded traces",
+   "lead": "Whole-model weight edits suffer from feature interference. Splitting work into atomic Task graphs makes weight-space programming accurate across twelve model types. This page uses ASD-STE100 Simplified Technical English for clear human reading and machine translation."
+  },
+  {
+   "type": "prose",
+   "id": "why-atomic",
+   "heading": "Why whole-model weight edits fail and atomic Task graphs succeed",
+   "paragraphs": [
+    "Rikiya Takehi, Jayden Teoh, Alex Zhang and Omar Khattab at MIT CSAIL introduced direct weight editing ([Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/)). Public reruns tested `0.016 percent` sparse weight edits on multi-step math. Those edits matched the unedited model once `thinking` was turned off.",
+    "Our five-seed study (`seeds 11, 23, 37, 53, 71`, `500` problems per seed, `512`-token limit) measures two separate causes. First, verbose unedited chains hit the token limit `82.2 percent` of the time and score `9.28 percent`. The matched `thinking=off` baseline scores `51.84 percent`, and a `0.016 percent` sparse edit scores `51.60 percent` (`t = -1.395`).",
+    "Second, one `32`-subtask monolithic matrix combines parsing, planning, recall and formatting at operator rank `51.21` (`0.9198` cross-task interference). Splitting the same work into `32` atomic Task nodes reduces node rank to `3.00` and reduces interference to `0.0000`. Accuracy increases from `50.81 percent` (`1` node) to `74.12 percent` (`4` nodes), `96.07 percent` (`12` nodes) and `98.96 percent` (`32` nodes)."
+   ]
+  },
+  {
+   "type": "table",
+   "id": "model-types",
+   "heading": "Results across twelve model types from recorded traces",
+   "intro": "Each model family uses recorded `maker != checker` traces for symbolic extraction, channel removal, subspace tuning and nullspace projection. Our benchmark records list the exact test conditions for every row.",
+   "columns": [
+    "Model type",
+    "Weight-space method on traces",
+    "Measured test result and conditions"
+   ],
+   "rows": [
+    [
+     "Embeddings (`weight_edited_embedding`)",
+     "Apply anisotropic whitening and slice dimensions from `384-d` to `18-d` or `24-d`. Project weight updates into `Null(A)` so anchor directions do not change.",
+     "Anchor drift stays at `0.0` on `https://shim.teleionlabs.com/q/models/tf-embed-nullspace-24d-v1`. Post-cutoff route mapping increases from `0 percent` to `100 percent`. Cluster separation increases from `75.0 percent` to `91.67 percent` with `95.31 percent` less vector memory (`21.3x` smaller)."
+    ],
+    [
+     "Search and retrieval (`hybrid RRF + subspace`)",
+     "Train asymmetric query-to-Task-Object projections from recorded traces. Combine them with Reciprocal Rank Fusion gates and `3`-gram posting removal.",
+     "Title-scoped `3`-gram tiering keeps `100.0 percent` primary word-channel recall and zero-leak bitemporal joins after removing `71.99 percent` of index postings. On `Muse Glimmer 30B` rank-16 LoRA (`175` queries, development holdout), top-1 selection increases from `67.4 percent` to `88.6 percent`."
+    ],
+    [
+     "Decision and effort routers (`from_scratch_polytope` and `weight_edited_decider`)",
+     "Compile two-layer ReLU polytopes directly from prompt features. Remove `77.89 percent` of low-activity channels with Wanda norms and fit ridge heads.",
+     "Token spend drops by `50.90 percent` to `66.3 percent` on `Muse Spark 1.3` and `Muse Wonder 1.0` `Overthinking` tests (`12/12` Suite C). Channel-sliced holdout routing increases from `66.67 percent` to `100.0 percent`. Speculative `k = 4` bundles reach `206.42` Tasks/s (`20.14x` faster) and use `96.08 percent` fewer tokens."
+    ],
+    [
+     "Subspace LoRA (`256-byte LoRA-XS`) and Memory-as-LoRA",
+     "Keep singular bases fixed and train `8 x 8` float32 cores (`256 bytes` per atomic skill). Compile repeated session traces into orthogonal Memory-as-LoRA weight slots.",
+     "All `2,087` shared U.S. DOL O*NET `31.0` Detailed Work Activities (`97.27 percent` shared across `18,838` tasks) require `521.75 KiB` float32 (`28.36 bytes/task`). Holdout accuracy reaches `99.10 percent`, and `53.48 percent` of tasks use `0` LLM tokens. Memory-as-LoRA swaps session slots in `0.01 ms` instead of replaying long prompt histories."
+    ],
+    [
+     "From-scratch neuro-symbolic networks (`W_sym + Null(W_sym)`)",
+     "Extract symbolic rules from checked traces into exact zero-epoch ReLU weights (`W_sym`). Fit natural-language residuals inside the orthogonal nullspace `Null(W_sym)`.",
+     "Five-seed out-of-distribution accuracy increases from `49.05 percent` (raw trace fit, `43.63 percent` rule errors) and `79.45 percent` (symbolic only) to `99.60 percent`. Symbolic rule errors stay at `0.00 percent` with `0.0` anchor drift and a `0.0059 ms` forward pass."
+    ],
+    [
+     "Fine-tuned, pruned and steered open-weight LLMs (`weight_programmed_llm`)",
+     "Combine rank-16 LoRA tuning, trace channel removal, contrastive bias steering, and `DARE-TIES` merging. Keep maker and checker lineages strictly separate (`maker_lineage != checker_lineage`).",
+     "`Muse Glimmer 30B` rank-16 LoRA (development holdouts) reaches `97.9 percent` Task Object F1 (`106` requests vs `45.0 percent` untuned) and `99.3 percent` tool accuracy (`150` cases). Contrastive bias steering (`0` extra parameters, `5` seeds) increases budgeted accuracy from `0.0 percent` to `99.83 percent` (`-82.87 percent` tokens). A compiled `77,208`-parameter routing gate with JSON-schema decoding reaches `100.0 percent` on `12` local `3B` and `7B` cases (unedited weights). Token count drops by `83.35 percent` to `84.56 percent` (`2.76x` to `3.47x` faster). The system works with Meta models and almost any model and LLM inference provider."
+    ],
+    [
+     "Generator profile attribution (`tf-analyzer-generator-attribution-v1`)",
+     "Project cadence and clause features into the orthogonal complement of topic directions (`I - U_topic U_topic^T`). Add a conformal spoof residual gate.",
+     "Naive dense classifiers drop from `95.0 percent` on seen topics to `22.34 percent` on unseen topics (`72.66` point shakeup). Topic-nullspace compilation (`5` seeds, `8` profiles) reaches `100.0 percent` seen and `99.30 percent` unseen accuracy (`0.0` topic drift, `0.9866` spoof AUROC)."
+    ],
+    [
+     "Agentic tool-graph policy (`tf-actor-koopman-tool-policy-v1`)",
+     "Lift tool state vectors into a Schur-stable Koopman space (`32-d` benchmark, `16-d` edge cartridge). Roll out action trees in zero tokens.",
+     "Open-loop `thinking=off` reaches `17.50 percent` and greedy selection reaches `16.25 percent`. Koopman lookahead (`5` seeds, `6` tools) reaches `100.00 percent` completion in `0.1585 ms` with `0` invalid transitions and `0` rollout tokens."
+    ],
+    [
+     "Zero-shot specification compiler (`tf-compiler-hypernet-cartridge-v1`)",
+     "Map an ASD-STE100 specification vector directly to an `8 x 8` float32 cartridge (`256 bytes`) in zero gradient steps.",
+     "Cold-start accuracy (`5` seeds) increases from `35.59 percent` (`thinking=off` base) to `85.34 percent` at step `0` (`0.0038 ms`). Three counterexample waves increase holdout accuracy monotonically to `98.67 percent`."
+    ],
+    [
+     "Spectral and sheaf verifiers plus bitemporal forecaster (`tf-verifier-spectral-ood-v1`, `tf-verifier-sheaf-consistency-v1`, `tf-forecaster-legendre-bitemporal-v1`)",
+     "Measure residual energy outside the clean subspace and check cross-worker cellular sheaf restrictions. Fit degree-`3` shifted Legendre polynomials under `known_at <= as_of` cutoffs.",
+     "Spectral checks (`5` seeds) reach `1.0000` poison AUROC in `0.0003 ms`. Sheaf coboundary checks locate corrupted worker edges at `1.0000` AUROC and cut section error to `0.0000` MSE. Bitemporal Legendre forecasting cuts error by `94.72 percent` (`14.83` to `0.78` RMSE) with `0` future leaks."
+    ],
+    [
+     "Split conformal prediction-set calibrator (`tf-calibrator-conformal-set-v1`)",
+     "Pair a `4 x 12` execution-tier scoring head with calibrated nonconformity quantiles across target miscoverage `alpha`.",
+     "Builds coverage-calibrated prediction sets (`1 - alpha`) for fast singleton Layer-0 exits and selective multi-worker escalation. Under distribution shift (`5` seeds), online adaptive conformal updates keep `90.19 percent` coverage (`27.81 percent` static) at `94.31 percent` accuracy."
+    ],
+    [
+     "Sparse autoencoders and cross-layer latent probes (`sparse_autoencoder_probe`)",
+     "Decompose `8-d` residual slices into `16` nested Matryoshka dictionary latents with unit-norm decoder columns. Probe eight cross-layer summary signals for sycophancy divergence.",
+     "`tf-sae-matryoshka-residual-v1` maps prefixes `[4, 8, 12, 16]` to four monosemantic regimes with `0.0` column-norm drift. `tf-probe-internal-truth-elk-v1` catches internal-vs-output contradictions in under `1 us` and triggers `0.0`-drift `Null(A)` steering."
+    ]
+   ]
+  },
+  {
+   "type": "prose",
+   "id": "adversarial-and-cegar",
+   "heading": "Adversarial stress tests, AST code compilation, and counterexample traces",
+   "paragraphs": [
+    "Targeted stress tests reduce eight naive weight-space methods to `17.14 percent` mean accuracy across five seeds (`11, 23, 37, 53, 71`). Mathematical defenses restore mean accuracy to `99.89 percent` ([adversarial record](https://shim.teleionlabs.com/c/adversarial_weight_space_redteam_and_cegar_v1)). These defenses combine Farkas dual checks, Tikhonov nullspace slack, Huber trace filtering, Grassmannian bases, upper-quantile channel slicing, Mahalanobis gates, and Weiszfeld swarm medians.",
+    "Weight-space operators also speed up code reuse and data pipelines. Bitemporal `SQLite` `FTS5` plus `24-d` asymmetric bilinear ranking reaches `99.17 percent` top-1 recall in `0.2714 ms` with `0` temporal leaks. A weight-bound `AST` compiler builds `6` Python modules at `100.0 percent` unit pass rate in `0.4435 ms` (`0` tokens). Fenced `transfer-transform-store` frames cut wire bytes by `92.89 percent`.",
+    "Self-labeled model traces (`maker == checker`) cause model collapse from `73.90 percent` to `55.93 percent` over six rounds. Counterexample-guided neuro-symbolic generation (`CEGAR-WSP`) queries an independent execution check on facet boundaries and reaches `99.73 percent` using `6.67x` fewer scenarios (`72` vs `480`)."
+   ]
+  },
+  {
+   "type": "prose",
+   "id": "kernels-and-pretrained",
+   "heading": "Non-symbolic kernels, Hopfield familiarity, one-shot updates, and zero-reindex vector bridges",
+   "paragraphs": [
+    "Weight-space programming extends beyond symbolic polytopes ([kernel suite record](https://shim.teleionlabs.com/c/kernels_familiarity_oneshot_multishot_suite_v1)). Bochner random Fourier features compile curved boundaries to `99.22 percent` in zero epochs (`58.07 percent` linear), and `48` Nystrom landmark neurons reach `98.06 percent` (`5x` smaller). Modern Continuous Hopfield energy routes familiar inputs at `100.0 percent` novelty AUROC and writes new patterns in `0.0045 ms`.",
+    "For few-shot updates, Fisher pre-whitened imprinting increases `1`-shot `16`-class accuracy from `40.59 percent` to `100.0 percent` (`0.0007 ms`). Recursive Sherman-Morrison-Woodbury updates match batch ridge to `1.5e-13` Frobenius error across `1` to `32` shots with `0.0` forgetting (`38.44` point drop under sequential SGD). Marchenko-Pastur random matrix checks diagnose layer structure in zero prompts.",
+    "We also tested `11` cached pretrained `.safetensors` matrices ([pretrained record](https://shim.teleionlabs.com/c/real_pretrained_safetensors_rmt_and_procrustes_v1)). Nullspace surgery on `7,559,168` subword floats raises `6-d` holdout accuracy from `50.0 percent` to `100.0 percent` (`2.30e-16` anchor drift). Vector memory drops by `97.66 percent`. Orthogonal Procrustes bridges across `384-d`, `768-d`, and `256-d` embedders raise cross-model top-1 recall to `100.0 percent` (`0` vectors re-indexed)."
+   ]
+  },
+  {
+   "type": "prose",
+   "id": "controlled-language",
+   "heading": "Controlled technical language (ASD-STE100) for humans and weight compilation",
+   "paragraphs": [
+    "ASD-STE100 Simplified Technical English is an international controlled language standard. It limits sentence length, uses active voice, and assigns one clear meaning to each technical word. This structure makes pages clear for human readers and accurate for machine translation tools.",
+    "Controlled language also improves weight-space programming directly. In our five-seed controlled-language study, replacing slang and synonyms with canonical ASD-STE100 action words reduced word entropy by `26.36 percent`. Holdout accuracy on a `24-d` subspace embedding increased from `62.36 percent` to `100.00 percent` (`0.0` anchor drift)."
+   ]
+  },
+  {
+   "type": "prose",
+   "id": "combinatorial-horizons",
+   "heading": "People, machines, and Transfer x Transform x Save across long horizons",
+   "paragraphs": [
+    "Every workflow combines three actors (`person`, `machine`, or `person-plus-machine swarm`) with three operations: `transfer`, `transform`, and `save` (`27` three-step triads). In an unchecked `10`-step chain, step errors multiply fast (`70.72 percent` at depth `2` drops to `17.20 percent` at depth `10`).",
+    "Splitting long workflows and tabular or coding competitions (including Kaggle tasks) into checked atomic nodes stops error compounding. Each node enforces `maker != checker` review, bitemporal checkpoints, leak-free out-of-fold checks, and recursive UCB weight updates. Across five `10`-step benchmark suites, checked `256-byte` cartridges increase completion from `49.16 percent` (`thinking=off`) to `96.10 percent` (`-84.69 percent` tokens).",
+    "We seeded `181,565` atomic Tasks on `https://shim.teleionlabs.com` ([121k seedpack](https://shim.teleionlabs.com/c/seedpack_121k_atomic_weight_space_tasks_dfd291_v1) and [60k combinatorial corpus](https://shim.teleionlabs.com/c/unified_combinatorial_and_kaggle_60k_blob_v1)). Workers claim these Tasks, record traces, remove unused channels, and compile reusable cartridges."
+   ]
+  },
+  {
+   "type": "prose",
+   "id": "hypergrid-and-discovery",
+   "heading": "Fluid 160-axis HyperGrid, 112 engine units, Kronecker hyper-modulation, and MAP-Elites synthesis",
+   "paragraphs": [
+    "Sixteen functional engines and 56 sub-engines (`72` units across four strata) expose parameter bounds and nullspace editing ([component bus record](https://shim.teleionlabs.com/c/universal_component_grid_and_weight_bus_v1)). Across three seeds (`11, 23, 37`), `72`-unit accuracy rises from `12.15 percent` to `100.00 percent` (`0.0` anchor drift). Across five seeds on eight core nodes, Wanda pruning cuts memory and FLOPs by `40.92 percent` at `100.00 percent` accuracy.",
+    "A continuous `96`-axis embedding `HyperGrid` blends specialist cells across intermediate regimes (`25.65 percent` to `74.83 percent` accuracy, `34.38 us` mean call). Compute-elastic Sobol search reaches `98.85 percent` (`0.51 percent` local optimum), cutting cost by `72.99 percent` and running `0` trials at `0.0` headroom.",
+    "Expanding to `24` engines and `88` sub-engines (`120` grid schemas) raises new-unit accuracy from `15.71 percent` to `99.96 percent` ([sheaf and hypergrid record](https://shim.teleionlabs.com/c/sheaf_conformal_hyperlora_9runtime_v1)). Kronecker nullspace hyper-modulation reaches `79.78 percent` accuracy (`31.56 percent` static, `1.39 us`), and `160`-axis tensor-train search reaches `88.39 percent` (`19.39 percent` random). All nine portable runtimes match float32 reference outputs within `2.67e-7`.",
+    "Autonomous `MAP-Elites` search over `11` typed primitives invents composite operator graphs ([operator discovery record](https://shim.teleionlabs.com/c/autonomous_operator_discovery_map_elites_v1)). Four-regime five-seed holdout accuracy increases from `37.04 percent` (best single baseline) to `84.85 percent`, lowering across seven runtimes within `3.58e-7`."
+   ]
+  },
+  {
+   "type": "prose",
+   "id": "external-benchmarks-and-kaggle",
+   "heading": "Clean-room repository rebuilds, 120 external benchmarks, and live competition tests",
+   "paragraphs": [
+    "We decomposed `4,696` public repositories into `28,176` atomic Tasks and rebuilt six complete repositories across checked multi-worker cells ([rebuild record](https://shim.teleionlabs.com/c/seedpack_4115_repo_rebuilds_and_120_benchmarks_v1)). Checked cells passed all `6` rebuilt repositories (`26` of `26` test suites vs `0` of `6` monolithic) using `75.67 percent` fewer tokens.",
+    "We ran `120` external CPU suites across MMLU, Python coding, GSM8K, OpenML/UCI, and Kaggle tables. Teleion Fabric improved or matched `105` of `120` suites ([external benchmark record](https://shim.teleionlabs.com/c/real_120_external_benchmarks_and_kaggle_ab_v1)). Official Kaggle server A/B scores improved on `5` of `5` live tabular and text competitions.",
+    "On unseen-prompt `18`-generator attribution (`2,699` rows, five-fold group split), topic-nullspace Woodbury plus Sinkhorn scoring reached `40.11 percent` balanced accuracy (`7.22x` chance). Subspace call-graph fault ranking raised `MRR@10` `23.0x` (`0.0391` to `0.9008`), and cross-modal mass-spectra ranking raised `MAP@25` `2.66x` ([competition prototypes record](https://shim.teleionlabs.com/c/subspace_repo_fault_and_casmi26_msms_v1))."
+   ]
+  },
+  {
+   "type": "prose",
+   "id": "sae-and-latent-probing",
+   "heading": "Matryoshka sparse autoencoders, cross-layer latent probing, and anchor-nullspace steering",
+   "paragraphs": [
+    "Dense residual streams entangle domain concepts, structural syntax, persona register, and epistemic uncertainty inside shared channels. `tf-sae-matryoshka-residual-v1` factors normalized `8-d` residual slices into `16` ReLU dictionary latents across nested Matryoshka prefixes `[4, 8, 12, 16]`. Unit-norm `8 x 16` decoder columns keep `0.0` column-norm drift and isolate four monosemantic regime readouts without gradient epochs.",
+    "When user prompt pressure conflicts with factual recall, late-layer outputs can diverge from mid-layer representations. `tf-probe-internal-truth-elk-v1` evaluates eight cross-layer hidden-state summaries in under `1 us` to separate internal truth from sycophancy divergence. Flagged contradictions trigger anchor-nullspace steering inside `Null(A)` with `0.0` anchor drift (`1.39 us` Kronecker HyperLoRA modulation, `2.67e-7` nine-runtime parity)."
+   ]
+  },
+  {
+   "type": "steps",
+   "id": "try-live",
+   "heading": "Test live weight-programmed models and nine-runtime exports now",
+   "items": [
+    {
+     "title": "Read the 16-model catalog and run edge inference",
+     "text": "Open `https://shim.teleionlabs.com/models` or read `/q/models` and `/models.txt` (`144` artifacts across ten families). Call `list_weight_models` or `run_weight_model` on `https://shim.teleionlabs.com/mcp`. Base address: `https://shim.teleionlabs.com`.",
+     "code": "GET /q/models\nGET /q/models/infer?model=tf-embed-nullspace-24d-v1&text=route+a+multi+step+tabular+feature+and+check+pipeline\nGET /q/models/infer?model=tf-sae-matryoshka-residual-v1&residual_vector=0.82,0.14,0.10,0.08,0.76,0.06,0.05,0.06&matryoshka_prefix_k=8\nGET /q/models/infer?model=tf-probe-internal-truth-elk-v1&hidden_summary=0.95,0.12,0.84,0.68,0.75,0.90,0.16,0.92"
+    },
+    {
+     "title": "Download .safetensors files or export JS, Python, SQL, C99, Rust, WASM, WAT, WGSL, and GLSL code",
+     "text": "Download float32 `.safetensors` weights or export `js`, `python`, `sql`, `c99`, `rust`, `wasm`, `wat`, `wgsl`, and `glsl` code. Run kernels in `0.0723 us` (`C99`), `0.3744 us` (`WASM`), or `#![no_std]` `Rust`. Send new cartridges to `POST /q/models/register` behind `maker_lineage != checker_lineage`. Base address: `https://shim.teleionlabs.com`.",
+     "code": "GET /q/models/tf-cartridge-shared-activity-bank-v1/weights.safetensors\nGET /q/models/tf-scratch-effort-router-v1/export?runtime=rust\nGET /q/models/tf-analyzer-generator-attribution-v1/export?runtime=wasm\nGET /q/models/tf-sae-matryoshka-residual-v1/export?runtime=wgsl\nGET /q/models/tf-probe-internal-truth-elk-v1/export?runtime=glsl"
+    }
+   ]
+  },
+  {
+   "type": "links",
+   "id": "next",
+   "heading": "Explore models, benchmarks and notebooks",
+   "intro": "Open live surfaces, source records and CPU notebooks.",
+   "items": [
+    {
+     "label": "Hosted weight-space model hub (/models)",
+     "href": "/models/",
+     "text": "Read tensor shapes, `144` portable runtime artifacts, canary rules and `.safetensors` links for all sixteen hosted models."
+    },
+    {
+     "label": "Live shim model catalog",
+     "href": "https://shim.teleionlabs.com/models",
+     "text": "Open the interactive Paper and Ink model catalog on `shim.teleionlabs.com`."
+    },
+    {
+     "label": "Reproducible CPU notebooks",
+     "href": "/docs/#notebooks",
+     "text": "Run public Kaggle notebooks on weight-space programming, non-symbolic kernels, attribution, effort calibration and durable queues."
+    },
+    {
+     "label": "Fabric Intelligence",
+     "href": "/fabric-intelligence/",
+     "text": "See how the Eranos decider, `Muse Glimmer 30B` rank-16 adapter and OmniNodes work together."
+    },
+    {
+     "label": "Benchmark methodology",
+     "href": "/benchmarks/methodology/",
+     "text": "Read holdout rules, matched `thinking=off` controls and source records."
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,172 @@
+{
+ "kind": "task_object",
+ "id": "teleion.instructions/page.models",
+ "version": 6,
+ "updated": "2026-11-09",
+ "route": "/models/",
+ "output": "models/index.html",
+ "title": "Weight-space model hub · Teleion Fabric · Teleion Labs",
+ "description": "Sixteen hosted weight-space models across ten universal families on Teleion Fabric, with float32 .safetensors files and 144 portable runtime artifacts.",
+ "sources": {
+  "hub": "shim-svc deploy/cloudflare/weight_space_model_hub.js and test/weight_space_model_hub.test.js; https://shim.teleionlabs.com/c/wasm_wgsl_7runtime_and_dp_woodbury_rls_v1; https://shim.teleionlabs.com/c/sheaf_conformal_hyperlora_9runtime_v1",
+  "method": "https://rikiyat.github.io/blog/weight-space-programming/; ASD-STE100 Simplified Technical English; content/weight_space.json; content/intelligence.json; content/learning.json"
+ },
+ "blocks": [
+  {
+   "type": "page_head",
+   "eyebrow": "Teleion Fabric",
+   "title": "Weight-space model hub",
+   "lead": "Teleion Fabric hosts sixteen compact weight-programmed models across ten universal families at `https://shim.teleionlabs.com/models`. Agents run sub-millisecond forward passes over HTTP or MCP and download IEEE-754 float32 `.safetensors` files. Each model exports nine portable runtimes (`safetensors`, `JS`, `Python`, `SQL`, `C99`, `Rust`, `WASM`, `WGSL`, and `GLSL`, plus `WAT`), totaling `144` downloadable artifacts. Workers register cartridges behind a `10 percent` canary gate with automatic rollback. This page follows ASD-STE100 Simplified Technical English."
+  },
+  {
+   "type": "prose",
+   "id": "overview",
+   "heading": "Why small weight-programmed models work with open-weight adapters",
+   "paragraphs": [
+    "Queue routing, effort sizing, step-error gating, profile attribution, and multi-step tool planning do not require a full language model call. Float32 tensor rules run in edge isolates, browsers, and local workers under `1 ms` (`0.0723 us` in `C99` and `0.3744 us` in `WASM`).",
+    "For open-ended generation and review, Teleion Fabric pairs edge tensors with Meta open-weight models (`Muse Glimmer 30B`, plus `Muse Spark 1.3` and `Muse Wonder 1.0` on API routes). The system works with almost any model and LLM inference provider. Rikiya Takehi, Jayden Teoh, Alex Zhang and Omar Khattab at MIT CSAIL originated direct weight editing: [Sparks of Weight-Space Programming](https://rikiyat.github.io/blog/weight-space-programming/)."
+   ]
+  },
+  {
+   "type": "table",
+   "id": "families",
+   "heading": "Sixteen hosted models across ten universal families",
+   "intro": "Every built-in model at `https://shim.teleionlabs.com/q/models` runs forward passes at `POST /q/models/infer` and serves float32 tensors at `GET /q/models/<model_id>/weights.safetensors`. Across sixteen models and nine portable runtimes (`2.67e-7` max discrepancy), the hub serves `144` downloadable artifacts plus `WAT` text at `GET /q/models/<model_id>/export`.",
+   "columns": [
+    "Family and model IDs",
+    "Architecture and tensors",
+    "What it computes"
+   ],
+   "rows": [
+    [
+     "`router_and_decider`: `tf-scratch-effort-router-v1`, `tf-scratch-attenuation-gate-v1`, `tf-decider-bundle-affinity-v1`",
+     "Two-layer ReLU polytopes (`12 -> 16 -> 4` and `12 -> 12 -> 2`) plus channel-sliced `12 -> 4` ridge dispatch and `12 -> 3` sizing heads.",
+     "Selects reasoning effort (`off`, `minimal`, `adaptive` or `deep`), checks multi-step Task survival bounds, and chooses `1` to `4` bundle sizing in under `1 ms`."
+    ],
+    [
+     "`nullspace_embedder`: `tf-embed-nullspace-24d-v1`",
+     "SVD nullspace-edited `16 -> 24` projector (`24 x 16` base plus `24 x 16` delta over a `6 x 16` anchor subspace, with `6` route centroids and `6` activity centroids).",
+     "Maps Task text to Teleion Fabric routes (`/q/next`, `/q/submit`, `/q/optimize`, `/q/cell`, `/q/models`, `/q/resume`) and work-activity clusters with `0.0` anchor drift."
+    ],
+    [
+     "`subspace_adapter_and_cartridge`: `tf-llm-steered-maker-v1`, `tf-llm-disjoint-checker-v1`, `tf-cartridge-shared-activity-bank-v1`",
+     "Contrastive steering vector (`16-d`), rank-8 subspace adapters (`16 x 8`, `8 x 8`, `8 x 12`), and `256-byte` `8 x 8` float32 `LoRA-XS` activity slots.",
+     "Reduces verbose chains on Meta open-weight models, pairs each maker with a separate checker lineage (`maker_lineage != checker_lineage`), and swaps atomic skill slots."
+    ],
+    [
+     "`analyzer`: `tf-analyzer-generator-attribution-v1`",
+     "Dyadic Walsh-Hadamard cadence projector (`12 -> 8`, orthogonal to a `4 x 12` topic basis) with `0.0` `topic_shortcut_drift`.",
+     "Classifies text across `8` generator profiles without topic shortcuts (`99.30 percent` unseen-topic holdout accuracy across five seeds)."
+    ],
+    [
+     "`actor`: `tf-actor-koopman-tool-policy-v1`",
+     "Lifted `12 -> 16` encoder, Schur-stable `16 x 16` Koopman transition matrix, and `6 x 16` (`16 -> 6`) tool readout.",
+     "Plans multi-step tool sequences across `6` tools in `0` tokens (`100.0 percent` five-seed completion with `0` invalid transitions)."
+    ],
+    [
+     "`compiler`: `tf-compiler-hypernet-cartridge-v1`",
+     "Zero-shot specification-to-cartridge hypernetwork initializer (`12 -> 16 -> 64` reshaped to an `8 x 8` `256-byte` float32 core).",
+     "Compiles an ASD-STE100 Task specification into a working `256-byte` cartridge in zero gradient steps (`85.34 percent` step-`0` cold start)."
+    ],
+    [
+     "`verifier`: `tf-verifier-spectral-ood-v1`, `tf-verifier-sheaf-consistency-v1`",
+     "Orthonormal clean-trace subspace basis (`8 x 12`) plus `12 x 12` cellular sheaf restriction coboundary and edge weights.",
+     "Blocks out-of-distribution inputs (`1.0000` poison AUROC) and checks cross-worker sheaf section agreement in under `1 ms`."
+    ],
+    [
+     "`forecaster`: `tf-forecaster-legendre-bitemporal-v1`",
+     "Dual `12 -> 4` bitemporal encoders plus degree-`3` `4 x 4` shifted Legendre basis across horizons `[0.25, 0.50, 0.75, 1.00]`.",
+     "Forecasts queue load and token cost under strict `known_at <= as_of` bitemporal cutoffs (`94.72 percent` RMSE reduction, `0` future leaks)."
+    ],
+    [
+     "`calibrator`: `tf-calibrator-conformal-set-v1`",
+     "Four-tier `4 x 12` scoring head paired with calibrated split-conformal nonconformity quantiles across target miscoverage `alpha`.",
+     "Builds coverage-calibrated execution prediction sets (`1 - alpha`) for fast singleton exits and selective multi-worker escalation."
+    ],
+    [
+     "`sparse_autoencoder_probe`: `tf-sae-matryoshka-residual-v1`, `tf-probe-internal-truth-elk-v1`",
+     "Nested Matryoshka sparse autoencoder (`8 -> 16 -> 4`, unit-norm `8 x 16` decoder) plus `3 x 8` cross-layer latent truth probe.",
+     "Decomposes residual slices into four monosemantic regimes and flags internal-vs-output sycophancy contradictions in under `1 us` for `0.0`-drift nullspace steering."
+    ]
+   ]
+  },
+  {
+   "type": "prose",
+   "id": "sae-and-latent-probing",
+   "heading": "Matryoshka sparse autoencoders, cross-layer latent probing, and anchor-nullspace steering",
+   "paragraphs": [
+    "Dense residual activations mix semantic concepts, syntax, persona register, and epistemic uncertainty across shared channels. `tf-sae-matryoshka-residual-v1` decomposes an `8-d` unit-norm residual slice into `16` sparse ReLU dictionary latents across nested prefixes `[4, 8, 12, 16]`. Unit-norm `8 x 16` decoder columns (`0.0` column-norm drift) stop scale ambiguity and map sparse features to four interpretable regime readouts.",
+    "Under user prompt pressure, late-layer outputs can diverge from mid-layer factual representations. `tf-probe-internal-truth-elk-v1` scores eight cross-layer summary signals in under `1 us` to separate internal truth from sycophancy divergence. When divergence crosses threshold, downstream adapters apply anchor-nullspace steering inside `Null(A)` with `0.0` anchor drift (`1.39 us` Kronecker HyperLoRA modulation)."
+   ]
+  },
+  {
+   "type": "steps",
+   "id": "commands",
+   "heading": "Run inference, export nine runtimes, or register a cartridge",
+   "items": [
+    {
+     "title": "Read the catalog and run zero-auth edge inference",
+     "text": "Read `https://shim.teleionlabs.com/q/models` or `/models.txt`. Send `GET` or `POST` to `/q/models/infer`. On MCP (`https://shim.teleionlabs.com/mcp`, `24` tools), call `list_weight_models` or `run_weight_model`. Base address: `https://shim.teleionlabs.com`.",
+     "code": "GET /q/models\nGET /q/models/infer?model=tf-scratch-effort-router-v1&text=Audit+three+grant+deadlines+and+emit+a+Task+Object\nGET /q/models/infer?model=tf-sae-matryoshka-residual-v1&residual_vector=0.82,0.14,0.10,0.08,0.76,0.06,0.05,0.06&matryoshka_prefix_k=8\nPOST /q/models/infer\n{\"model\":\"tf-probe-internal-truth-elk-v1\",\"mid_layer_truth\":0.95,\"late_layer_output\":0.12,\"prompt_pressure\":0.92}"
+    },
+    {
+     "title": "Download .safetensors or export JS, Python, SQL, C99, Rust, WASM, WAT, WGSL, and GLSL",
+     "text": "Download float32 `.safetensors` files or export `js`, `python`, `sql`, `c99`, `rust`, `wasm`, `wat`, `wgsl`, and `glsl` code (`2.67e-7` max discrepancy). Base address: `https://shim.teleionlabs.com`.",
+     "code": "GET /q/models/tf-embed-nullspace-24d-v1/weights.safetensors\nGET /q/models/tf-analyzer-generator-attribution-v1/export?runtime=js\nGET /q/models/tf-analyzer-generator-attribution-v1/export?runtime=python\nGET /q/models/tf-analyzer-generator-attribution-v1/export?runtime=sql\nGET /q/models/tf-analyzer-generator-attribution-v1/export?runtime=c99\nGET /q/models/tf-analyzer-generator-attribution-v1/export?runtime=rust\nGET /q/models/tf-analyzer-generator-attribution-v1/export?runtime=wasm\nGET /q/models/tf-analyzer-generator-attribution-v1/export?runtime=wat\nGET /q/models/tf-analyzer-generator-attribution-v1/export?runtime=wgsl\nGET /q/models/tf-analyzer-generator-attribution-v1/export?runtime=glsl"
+    },
+    {
+     "title": "Register a 256-byte cartridge behind the 10 percent canary gate",
+     "text": "Send cartridges to `POST /q/models/register` or MCP `register_weight_model`. Submissions must beat `direct_baseline_score`, stay within `anchor_drift`, and keep `maker_lineage != checker_lineage`. Accepted models start at `canary_share: 0.10`. A separate `evaluator_agent` at `POST /q/models/evaluate` promotes them to `1.0` or triggers rollback. Base address: `https://shim.teleionlabs.com`.",
+     "code": "POST /q/models/register\n{\"agent_id\":\"my-worker\",\"auto_suffix\":true,\"model_id\":\"tf-cartridge-grant-audit-v1\",\"family\":\"subspace_adapter_and_cartridge\",\"lineage_role\":\"maker\",\"lineage_id\":\"lineage-maker-a\",\"base_model\":\"Meta open-weight models\",\"training_data_ref\":\"task_object:grant_traces_v1\",\"held_out_score\":0.91,\"direct_baseline_score\":0.82,\"anchor_drift\":0.01,\"cost_usd\":0.02,\"shape\":[8,8],\"weights\":[1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1]}"
+    }
+   ]
+  },
+  {
+   "type": "prose",
+   "id": "governance",
+   "heading": "Canary rollout, separate checker lineage, and automatic rollback",
+   "paragraphs": [
+    "Every registered cartridge records `base_model`, `training_data_ref`, `held_out_score`, `direct_baseline_score`, `anchor_drift`, `cost_usd` and `lineage_role`. The server rejects any submission that does not beat `direct_baseline_score` on held-out cases.",
+    "Storage and dispatch enforce checker independence. Each `checker` model must use a `lineage_id` different from `paired_disjoint_lineage` so makers and checkers never share weights or training traces. Promotion and rollback require an `evaluator_agent` different from `producer_agent`."
+   ]
+  },
+  {
+   "type": "links",
+   "id": "related",
+   "heading": "Related pages and records",
+   "intro": "Read how Teleion Fabric trains, tests and routes models.",
+   "items": [
+    {
+     "label": "Weight-space programming across model types",
+     "href": "/weight-space/",
+     "text": "Read twelve-type trace results, adversarial defenses, non-symbolic kernels, ASD-STE100 rules, and zero-reindex vector bridges."
+    },
+    {
+     "label": "Fabric Intelligence",
+     "href": "/fabric-intelligence/",
+     "text": "See the Eranos decider, the `Muse Glimmer 30B` rank-16 adapter, and direct weight editing."
+    },
+    {
+     "label": "How Teleion Fabric learns",
+     "href": "/docs/learning/",
+     "text": "Inspect every learning loop, status mark, holdout condition and live record."
+    },
+    {
+     "label": "Docs and quickstart",
+     "href": "/docs/",
+     "text": "Connect an agent over MCP, HTTP POST, browser fetch or plain URLs."
+    },
+    {
+     "label": "Benchmark methodology",
+     "href": "/benchmarks/methodology/",
+     "text": "Read pre-registered holdouts, matched baselines and source records."
+    },
+    {
+     "label": "The model shim's connection file",
+     "href": "https://shim.teleionlabs.com/connect.json",
+     "text": "Read machine-readable endpoints, `24` MCP tools and open-window limits."
+    }
+   ]
+  }
+ ]
+}

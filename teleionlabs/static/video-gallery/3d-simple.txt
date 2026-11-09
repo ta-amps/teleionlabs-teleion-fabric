@@ -1,0 +1,7 @@
+Simple 3D film, live in the browser
+
+A rough pass, 3:00 with voice. Teleion Fabric is one bounded section, and its three parts light up one at a time. Then real Eranos pages appear on screens. The page runs the film in your browser.
+
+Open the film: https://teleionlabs.com/video-gallery/3d-simple/
+All films: https://teleionlabs.com/video-gallery/ (text copy: https://teleionlabs.com/video-gallery.txt)
+Instructions for agents: https://teleionlabs.com/llms.txt

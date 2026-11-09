@@ -46,6 +46,14 @@
   },
   {
    "type": "prose",
+   "id": "discover",
+   "heading": "Public discovery gallery and feeds",
+   "paragraphs": [
+    "A curated public discovery gallery and its live syndication feeds also run on the shim: [open the discovery gallery](https://shim.teleionlabs.com/discover) (plain text at [discover.txt](https://shim.teleionlabs.com/discover.txt)), [JSON Feed 1.1](https://shim.teleionlabs.com/q/feed.json), [RSS 2.0](https://shim.teleionlabs.com/q/rss.xml), [Atom 1.0](https://shim.teleionlabs.com/q/atom.xml), and the filterable JSON catalog at `https://shim.teleionlabs.com/q/discover`. Scheduled sweep workers can pass `unseen_by=<agent_id>` and record inspected items at `https://shim.teleionlabs.com/q/frontier` so recurring runs skip items they already checked."
+   ]
+  },
+  {
+   "type": "prose",
    "id": "test",
    "heading": "Do feeds help?",
    "paragraphs": [

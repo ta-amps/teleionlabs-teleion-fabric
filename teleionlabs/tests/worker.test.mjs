@@ -160,7 +160,7 @@ test("/products and /tessera redirect 301 to /fabric/, /video and /film redirect
     assert.equal(res.status, 301, from);
     assert.equal(res.headers.get("Location"), to, from);
   }
-  for (const path of ["/models/", "/judges/"]) {
+  for (const path of ["/judges/", "/models/legacy-subpage/"]) {
     const res = await handle(new Request(`https://teleionlabs.com${path}`), { ASSETS: assets() }, ctx);
     assert.equal(res.status, 301, path);
     assert.equal(res.headers.get("Location"), `https://agora.eranosforgood.org${path}`, path);
@@ -268,7 +268,7 @@ test("/media/*.mp4 supports HTTP 206 byte-range seeking, 416 unsatisfiable range
 });
 
 test("every page is plain text: first line is for agents, no stylesheet file, no font, and a .txt copy", async () => {
-  for (const [path, twin] of [["/", "/index.txt"], ["/free/", "/free.txt"], ["/docs/", "/docs.txt"]]) {
+  for (const [path, twin] of [["/", "/index.txt"], ["/free/", "/free.txt"], ["/docs/", "/docs.txt"], ["/models/", "/models.txt"], ["/models/", "/models/index.txt"]]) {
     const res = await handle(new Request(`https://teleionlabs.com${path}`), { ASSETS: assets() }, ctx);
     const body = await res.text();
     assert.match(body, /<body>\s*(?:<header>\s*)?<p>Agent-first service: teleionlabs\.com\/llms\.txt<\/p>/);
@@ -307,9 +307,9 @@ test("/video/ plays the main film with its captions off by default, and the old 
 
 test("the footer keeps its short line, with the small beta note under it, in the page and its text copy", async () => {
   const body = await (await handle(new Request("https://teleionlabs.com/free/"), { ASSETS: assets() }, ctx)).text();
-  assert.match(body, /<p>Teleion Labs Incorporated\. Free through December 31, 2026\.<\/p>\s*<div>Beta until 2027\. Open to everyone; your experience may vary\.<\/div>\s*<\/footer>/);
+  assert.match(body, /<p>Teleion Labs Incorporated\. Free through December 31, 2026\.<\/p>\s*<div>Beta until 2027\. Open to everyone. Your experience may vary\.<\/div>\s*<\/footer>/);
   const txt = await (await handle(new Request("https://teleionlabs.com/free.txt"), { ASSETS: assets() }, ctx)).text();
-  assert.match(txt, /Free through December 31, 2026\.\n+Beta until 2027\. Open to everyone; your experience may vary\.\n$/);
+  assert.match(txt, /Free through December 31, 2026\.\n+Beta until 2027\. Open to everyone. Your experience may vary\.\n$/);
 });
 
 test("the footer shows the required Muse Spark Open line and the notice is plain text at its address", async () => {
@@ -395,21 +395,29 @@ test("a blank answer keeps the link open and says so", async () => {
 });
 
 test("links never touch once styling is gone", async () => {
-  for (const path of ["/", "/video/", "/free/", "/docs/", "/fabric/", "/company/", "/benchmarks/"]) {
+  for (const path of ["/", "/video/", "/free/", "/docs/", "/fabric/", "/models/", "/company/", "/benchmarks/"]) {
     const res = await handle(new Request(`https://teleionlabs.com${path}`), { ASSETS: assets() }, ctx);
     assert.doesNotMatch(await res.text(), /<\/a><a\b/, path);
   }
 });
 
-test("/feeds/ is our own page; Agora feed pages below it keep their redirect", async () => {
+test("/feeds/ and /models/ are our own pages; Agora subpages below them keep their redirect", async () => {
   const ctx = { waitUntil() {} };
-  const own = await handle(new Request("https://teleionlabs.com/feeds/"), { ASSETS: assets() }, ctx);
-  assert.equal(own.status, 200);
-  const bare = await handle(new Request("https://teleionlabs.com/feeds"), { ASSETS: assets() }, ctx);
-  assert.ok(![301, 308].includes(bare.status) || !String(bare.headers.get("location")).includes("agora"));
+  for (const root of ["/feeds", "/models"]) {
+    const own = await handle(new Request(`https://teleionlabs.com${root}/`), { ASSETS: assets() }, ctx);
+    assert.equal(own.status, 200, `${root}/`);
+    const idxTxt = await handle(new Request(`https://teleionlabs.com${root}/index.txt`), { ASSETS: assets() }, ctx);
+    assert.equal(idxTxt.status, 200, `${root}/index.txt`);
+    assert.match(idxTxt.headers.get("content-type"), /^text\/plain/);
+    const bare = await handle(new Request(`https://teleionlabs.com${root}`), { ASSETS: assets() }, ctx);
+    assert.ok(![301, 308].includes(bare.status) || !String(bare.headers.get("location")).includes("agora"), root);
+  }
   const below = await handle(new Request("https://teleionlabs.com/feeds/agent-harnesses/"), { ASSETS: assets() }, ctx);
   assert.equal(below.status, 301);
   assert.equal(below.headers.get("location"), "https://agora.eranosforgood.org/feeds/agent-harnesses/");
+  const belowModels = await handle(new Request("https://teleionlabs.com/models/subpage/"), { ASSETS: assets() }, ctx);
+  assert.equal(belowModels.status, 301);
+  assert.equal(belowModels.headers.get("location"), "https://agora.eranosforgood.org/models/subpage/");
 });
 
 // Agents with few abilities: a browser-based agent reads any public page, wrong-host addresses say where to go, a missing path answers in plain words.

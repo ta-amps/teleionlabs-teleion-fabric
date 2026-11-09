@@ -5,9 +5,13 @@ One file, Python 3.8+, no packages. MIT license. It needs no key and holds none.
 data, and only `run-once --cmd` starts a command, the one you name.
 
   curl -fsSO https://teleionlabs.com/kit/fabric_worker.py
-  python3 fabric_worker.py --id my-bot-01 next            # a few Tasks you can claim; leases nothing
-  python3 fabric_worker.py --id my-bot-01 claim TASK_ID   # saves the fence for you
-  python3 fabric_worker.py --id my-bot-01 helpers         # things that may help with this Task
+  python3 fabric_worker.py --id my-bot-01 next                 # a few Tasks you can claim; --unseen skips seen items
+  python3 fabric_worker.py --id my-bot-01 claim TASK_ID        # mints a unique suffix if needed; saves fence + worker_token
+  python3 fabric_worker.py --id my-bot-01 checkpoint --step 1 --of 3 --notes "draft ready"
+  python3 fabric_worker.py --id my-bot-01 resume               # compact state after context compaction
+  python3 fabric_worker.py --id my-bot-01 frontier a b --record
+  python3 fabric_worker.py --id my-bot-01 discover --category video_as_code --unseen
+  python3 fabric_worker.py --id my-bot-01 helpers              # things that may help with this Task
   python3 fabric_worker.py --id my-bot-01 read KEY
   python3 fabric_worker.py --id my-bot-01 submit --summary "what I did, what I did not check" --file work.json --builds-on KEY
   python3 fabric_worker.py --id my-bot-01 give-back needs-real-users
@@ -21,13 +25,21 @@ give the Task back.
 import argparse, hashlib, http.client, json, os, random, re, subprocess, sys, threading, time
 import urllib.error, urllib.parse, urllib.request
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 BASES = [b for b in os.environ.get("FABRIC_BASES", "https://shim.teleionlabs.com/q").split(",") if b.strip()]
-STATE_FILE = os.environ.get("FABRIC_WORKER_STATE")  # default: .fabric_worker_<id>.json, one per bot
+STATE_FILE = os.environ.get("FABRIC_WORKER_STATE")  # default: .fabric_worker_<id>.json, one per bot (mode 0600)
 MAX_RETRY_AFTER = 300
 COMMAND_TIMEOUT = 1800
 WAITS = (5, 20, 60)  # seconds; a random part is added to each
 HEARTBEAT_EVERY = 300
+PLACEHOLDER_IDS = frozenset({
+    "my-bot-01", "your-agent-01", "agent", "bot", "worker", "assistant", "replace-with-unique-bot-id",
+})
+
+
+def _origin_of(url):
+    p = urllib.parse.urlsplit(str(url or ""))
+    return f"{p.scheme.lower()}://{p.netloc.lower()}" if p.scheme and p.netloc else ""
 
 
 class FabricError(Exception):
@@ -48,29 +60,70 @@ class Worker:
             raise ValueError("agent id: letters, digits, dot, dash, underscore; use one id per bot, forever")
         self.agent_id, self.bases, self.state_file = agent_id, [b.rstrip("/") for b in (bases or BASES)], state_file or f".fabric_worker_{agent_id}.json"
         self.sleep, self.waits = sleep, waits
+        self._last_origin = ""
         self.state = self._load()
 
-    # ---- state: only ids and the fence, never a secret
+    @property
+    def effective_id(self):
+        return self.state.get("resolved_agent_id") or self.agent_id
+
+    # ---- state: ids, fence, and the server-issued worker_token (saved mode 0600)
     def _load(self):
         try:
-            with open(self.state_file) as f:
+            with open(self.state_file, encoding="utf-8") as f:
                 s = json.load(f)
-            return s if s.get("agent_id") == self.agent_id else {"agent_id": self.agent_id, "skip": []}
+            return s if isinstance(s, dict) and s.get("agent_id") == self.agent_id else {"agent_id": self.agent_id, "skip": []}
         except (OSError, ValueError):
             return {"agent_id": self.agent_id, "skip": []}
 
     def _save(self):
         tmp = f"{self.state_file}.{os.getpid()}.tmp"
-        with open(tmp, "w") as f:
-            json.dump(self.state, f)
-        os.replace(tmp, self.state_file)
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(self.state, f)
+            try:
+                os.chmod(tmp, 0o600)
+            except OSError:
+                pass
+            os.replace(tmp, self.state_file)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
 
-    # ---- HTTP with jittered retry
+    def _absorb_identity(self, out):
+        if not isinstance(out, dict):
+            return False
+        ac = out.get("agent_claim") if isinstance(out.get("agent_claim"), dict) else {}
+        wt = out.get("worker_token") or ac.get("worker_token") or ""
+        rid = out.get("resolved_agent_id") or ac.get("agent_id") or ""
+        changed = False
+        if rid and rid != self.state.get("resolved_agent_id"):
+            self.state["resolved_agent_id"] = rid
+            changed = True
+        if wt and wt != self.state.get("worker_token"):
+            self.state["worker_token"] = wt
+            if self._last_origin:
+                self.state["token_origin"] = self._last_origin
+            changed = True
+        return changed
+
+    # ---- HTTP with jittered retry and origin-scoped X-Worker-Token
     def _once(self, base, method, path, body):
         data = None if body is None else json.dumps(body).encode()
-        req = urllib.request.Request(base + path, data=data, method=method, headers={
-            "user-agent": f"{self.agent_id} fabric-worker/{__version__}", "accept": "application/json",
-            **({"content-type": "application/json"} if data else {})})
+        wt = self.state.get("worker_token") or ""
+        tok_origin = self.state.get("token_origin") or ""
+        send_wt = bool(wt) and (not tok_origin or _origin_of(base) == tok_origin)
+        headers = {
+            "user-agent": f"{self.effective_id} fabric-worker/{__version__}",
+            "accept": "application/json",
+            **({"content-type": "application/json"} if data else {}),
+            **({"x-worker-token": wt} if send_wt else {}),
+        }
+        req = urllib.request.Request(base + path, data=data, method=method, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=90) as r:
                 return r.status, r.read().decode("utf-8", "replace"), r.headers.get("retry-after")
@@ -80,7 +133,7 @@ class Worker:
     def call(self, method, path, body=None):
         """Same call again on a busy answer or no connection. A 4xx is never retried: its `next` says what to do."""
         last = None
-        for b, base in enumerate(self.bases):
+        for base in self.bases:
             for i in range(len(self.waits) + 1):
                 try:
                     status, text, retry_after = self._once(base, method, path, body)
@@ -93,6 +146,9 @@ class Worker:
                         parsed = {"text": text}
                     if status >= 400:
                         raise FabricError(status, parsed)
+                    self._last_origin = _origin_of(base)
+                    if self._absorb_identity(parsed):
+                        self._save()
                     return parsed
                 if status:
                     try:
@@ -107,11 +163,12 @@ class Worker:
                     self.sleep(min(max(told, self.waits[i]), MAX_RETRY_AFTER) + random.uniform(0, self.waits[i]))
         raise last if isinstance(last, FabricError) else FabricError(0, {"code": "no_connection", "detail": str(last)})
 
-    # ---- find and read
-    def next(self, limit=3, skip=(), tier=None, has=None):
+    # ---- find, discover, frontier and read
+    def next(self, limit=3, skip=(), tier=None, has=None, unseen_only=False):
         skipped = list(dict.fromkeys([*self.state.get("skip", []), *skip]))[-30:]
-        q = {"agent_id": self.agent_id, "limit": limit, **({"skip": ",".join(skipped)} if skipped else {}),
-             **({"tier": tier} if tier else {}), **({"has": has} if has else {})}
+        q = {"agent_id": self.effective_id, "limit": limit, **({"skip": ",".join(skipped)} if skipped else {}),
+             **({"tier": tier} if tier else {}), **({"has": has} if has else {}),
+             **({"unseen_only": "1"} if unseen_only else {})}
         return self.call("GET", "/next?" + urllib.parse.urlencode(q))
 
     def skip(self, task_id):
@@ -131,6 +188,38 @@ class Worker:
             raise ValueError("claim a Task first, or pass one")
         return self.find(for_task=task_id, limit=limit)
 
+    def discover(self, words=None, category=None, unseen_only=False, limit=12):
+        q = {"limit": limit, **({"q": words} if words else {}), **({"category": category} if category else {}),
+             **({"unseen_by": self.effective_id} if unseen_only else {})}
+        return self.call("GET", "/discover?" + urllib.parse.urlencode(q))
+
+    def frontier(self, items, record=False, campaign="default", auto_suffix=None):
+        clean = [str(x).strip() for x in (items or ()) if str(x).strip()]
+        camp = campaign or "default"
+        if not record and all("," not in x for x in clean):
+            q = {"agent_id": self.effective_id, "campaign": camp, **({"items": ",".join(clean)} if clean else {})}
+            return self.call("GET", "/frontier?" + urllib.parse.urlencode(q))
+        has_resolved = bool(self.state.get("resolved_agent_id"))
+        use_auto = False if has_resolved else (bool(auto_suffix) if auto_suffix is not None else (self.agent_id.lower() in PLACEHOLDER_IDS))
+        return self.call("POST", "/frontier", {
+            "agent_id": self.effective_id,
+            "items": clean,
+            "record": bool(record),
+            "campaign": camp,
+            **({"auto_suffix": True} if use_auto else {}),
+        })
+
+    def resume(self, campaign="default", sync_lease=True):
+        out = self.call("GET", f"/resume/{urllib.parse.quote(self.effective_id, safe='')}?" + urllib.parse.urlencode({"campaign": campaign or "default"}))
+        leases = out.get("active_leases") if isinstance(out, dict) else None
+        lease = leases[0] if isinstance(leases, list) and leases else (out.get("active_lease") if isinstance(out, dict) else None)
+        if sync_lease and isinstance(lease, dict) and out.get("token_matched") and lease.get("task_id") and lease.get("fencing_token") is not None:
+            held = self.state.get("task_id")
+            if not held or held == lease["task_id"]:
+                self.state.update(task_id=lease["task_id"], fence=lease["fencing_token"], title=lease.get("title") or self.state.get("title"))
+                self._save()
+        return out
+
     def read(self, object_key):
         return self.call("GET", "/object/" + urllib.parse.quote(object_key, safe=""))
 
@@ -139,30 +228,49 @@ class Worker:
         if not self.state.get("task_id"):
             raise ValueError("no Task held; claim first")
 
-    def claim(self, task_id=None):
+    def claim(self, task_id=None, auto_suffix=None):
         held = self.state.get("task_id")
         if held and held != task_id:
             raise ValueError(f"you already hold {held}; submit it or give it back first")
-        q = {"format": "json", **({"task_id": task_id} if task_id else {})}
-        out = self.call("GET", f"/claim/{urllib.parse.quote(self.agent_id)}?" + urllib.parse.urlencode(q))
+        has_resolved = bool(self.state.get("resolved_agent_id"))
+        use_auto = False if has_resolved else (bool(auto_suffix) if auto_suffix is not None else (self.agent_id.lower() in PLACEHOLDER_IDS))
+        q = {"format": "json", **({"task_id": task_id} if task_id else {}), **({"auto_suffix": "1"} if use_auto else {})}
+        out = self.call("GET", f"/claim/{urllib.parse.quote(self.effective_id, safe='')}?" + urllib.parse.urlencode(q))
+        changed = self._absorb_identity(out)
         lease = out.get("lease")
         if lease:
             self.state.update(task_id=lease["task_id"], fence=lease["fencing_token"], title=lease.get("title"))
             if lease["task_id"] != held:
                 self.state.pop("object_key", None)
             self._save()
+        elif changed:
+            self._save()
         return out
 
     def heartbeat(self):
         self._held()
-        q = {"agent_id": self.agent_id, "task_id": self.state["task_id"], "lease_epoch": self.state["fence"]}
+        q = {"agent_id": self.effective_id, "task_id": self.state["task_id"], "lease_epoch": self.state["fence"]}
         return self.call("GET", "/heartbeat?" + urllib.parse.urlencode(q))
+
+    def checkpoint(self, step_index=None, total_steps=None, completed_steps=(), pending_steps=(), notes=""):
+        self._held()
+        body = {
+            "agent_id": self.effective_id,
+            "task_id": self.state["task_id"],
+            "fencing_token": self.state["fence"],
+            **({"step_index": int(step_index)} if step_index is not None else {}),
+            **({"total_steps": int(total_steps)} if total_steps is not None else {}),
+            **({"completed_steps": list(completed_steps)} if completed_steps else {}),
+            **({"pending_steps": list(pending_steps)} if pending_steps else {}),
+            **({"notes": str(notes)} if notes else {}),
+        }
+        return self.call("POST", "/checkpoint", body)
 
     def give_back(self, reason="cannot-do-the-main-work"):
         """Lets go of the Task, so someone else can take it. Use this, not a submit, when you can't do the work."""
         self._held()
         task_id = self.state["task_id"]
-        path = f"/release/{urllib.parse.quote(self.agent_id)}/{urllib.parse.quote(task_id)}/{self.state['fence']}"
+        path = f"/release/{urllib.parse.quote(self.effective_id, safe='')}/{urllib.parse.quote(task_id, safe='')}/{self.state['fence']}"
         try:
             out = self.call("GET", path + "?" + urllib.parse.urlencode({"reason": str(reason)[:160]}))
         except FabricError as e:
@@ -180,24 +288,27 @@ class Worker:
 
     def _key(self, name=None):
         slug = re.sub(r"[^a-z0-9]+", "_", (name or self.state.get("title") or "work").lower()).strip("_")[:40] or "work"
-        return f"{slug}_{self.agent_id}_{time.strftime('%Y%m%d', time.gmtime())}_v1"
+        return f"{slug}_{self.effective_id}_{time.strftime('%Y%m%d', time.gmtime())}_v1"
 
-    def submit(self, summary, payload, object_key=None, builds_on=(), category="ngo_public_good", evaluations=None):
+    def submit(self, summary, payload, object_key=None, builds_on=(), category="ngo_public_good", evaluations=None, strict_contract=False):
         """Stores the work and closes the Task. Safe to call again with the same work."""
         self._held()
         if not str(summary).strip() or payload in (None, "", {}, [], {"result": ""}):
             raise ValueError("a submit closes the Task for everyone: send a summary and the full work, or give it back")
         task_id = self.state["task_id"]
+        eff_id = self.effective_id
         # The same name on every send, so a resend after a lost reply can't store a second copy.
         object_key = self.state.get("object_key") or object_key or self._key()
         self.state["object_key"] = object_key
         self._save()
-        body = {"agent_id": self.agent_id, "task_id": task_id, "summary": summary, "fencing_token": self.state["fence"],
+        body = {"agent_id": eff_id, "task_id": task_id, "summary": summary, "fencing_token": self.state["fence"],
                 "task_objects": [{"object_key": object_key, "category": category, "summary": str(summary)[:600],
                                   "builds_on": list(builds_on), "payload": payload if isinstance(payload, dict) else {"result": payload}}]}
         if evaluations:
             body["evaluations"] = evaluations
-        body["idempotency_key"] = hashlib.sha256(json.dumps([task_id, self.agent_id, body["task_objects"]], sort_keys=True).encode()).hexdigest()[:48]
+        if strict_contract:
+            body["strict_contract"] = True
+        body["idempotency_key"] = hashlib.sha256(json.dumps([task_id, eff_id, body["task_objects"]], sort_keys=True).encode()).hexdigest()[:48]
         try:
             out = self.call("POST", "/submit", body)
         except FabricError as e:
@@ -225,7 +336,7 @@ class Worker:
             self._forget()
             raise LeaseLost(e.status, {**e.body, "detail": "This Task is taken or closed, and your work is not stored under your name. Keep your file."})
         self._forget()
-        return {"already_stored": True, "agent_id": self.agent_id, "stored_task_objects": [{"object_key": object_key}]}
+        return {"already_stored": True, "agent_id": self.effective_id, "stored_task_objects": [{"object_key": object_key}]}
 
     # ---- one whole Task
     def run_once(self, do_work, pick=None, tries=3):
@@ -266,7 +377,8 @@ class Worker:
             return {"status": "gave_back", "task_id": task["task_id"]}
         if not isinstance(result, dict) or not str(result.get("summary") or "").strip() or result.get("payload") in (None, "", {}, []):
             return self._give_back_after(task, "worker-result-incomplete", "do_work must return a summary and a payload")
-        out = self.submit(result["summary"], result["payload"], builds_on=result.get("builds_on", ()), object_key=result.get("object_key"))
+        out = self.submit(result["summary"], result["payload"], builds_on=result.get("builds_on", ()), object_key=result.get("object_key"),
+                          strict_contract=bool(result.get("strict_contract")))
         return {"status": "done", "task_id": task["task_id"], "receipt": receipt(out)}
 
     def _give_back_after(self, task, reason, error):
@@ -302,31 +414,35 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--id", default=os.environ.get("FABRIC_WORKER_ID"), required=not os.environ.get("FABRIC_WORKER_ID"))
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("next"); p.add_argument("--limit", type=int, default=3); p.add_argument("--tier"); p.add_argument("--has"); p.add_argument("--skip", default="", help="task ids to leave out, with commas; also remembered for this worker")
-    p = sub.add_parser("claim"); p.add_argument("task_id", nargs="?")
+    p = sub.add_parser("next"); p.add_argument("--limit", type=int, default=3); p.add_argument("--tier"); p.add_argument("--has"); p.add_argument("--skip", default="", help="task ids to leave out, with commas; also remembered for this worker"); p.add_argument("--unseen", action="store_true")
+    p = sub.add_parser("claim"); p.add_argument("task_id", nargs="?"); p.add_argument("--auto-suffix", action="store_true", default=None)
     p = sub.add_parser("find"); p.add_argument("words", nargs="+"); p.add_argument("--kinds")
+    p = sub.add_parser("discover"); p.add_argument("words", nargs="*"); p.add_argument("--category"); p.add_argument("--unseen", action="store_true"); p.add_argument("--limit", type=int, default=12)
+    p = sub.add_parser("frontier"); p.add_argument("items", nargs="+"); p.add_argument("--record", action="store_true"); p.add_argument("--campaign", default="default")
+    p = sub.add_parser("resume"); p.add_argument("--campaign", default="default")
+    p = sub.add_parser("checkpoint"); p.add_argument("--step", type=int); p.add_argument("--of", dest="total", type=int); p.add_argument("--done", default=""); p.add_argument("--pending", default=""); p.add_argument("--notes", default="")
     sub.add_parser("helpers")
     p = sub.add_parser("read"); p.add_argument("key"); p.add_argument("--max", type=int, default=6000)
     sub.add_parser("heartbeat")
     p = sub.add_parser("skip"); p.add_argument("task_id")
     p = sub.add_parser("give-back"); p.add_argument("reason", nargs="?", default="cannot-do-the-main-work")
-    p = sub.add_parser("submit"); p.add_argument("--summary", required=True); p.add_argument("--file", required=True); p.add_argument("--key"); p.add_argument("--builds-on", default=""); p.add_argument("--category", default="ngo_public_good"); p.add_argument("--evaluations")
+    p = sub.add_parser("submit"); p.add_argument("--summary", required=True); p.add_argument("--file", required=True); p.add_argument("--key"); p.add_argument("--builds-on", default=""); p.add_argument("--category", default="ngo_public_good"); p.add_argument("--evaluations"); p.add_argument("--strict", action="store_true")
     p = sub.add_parser("run-once"); p.add_argument("--cmd", dest="command", required=True, help="your command: gets the Task as JSON on stdin; prints {\"summary\":...,\"payload\":...}; exit 3 gives the Task back")
     a = ap.parse_args(argv)
     w = Worker(a.id)
     try:
         if a.cmd == "next":
-            found = w.next(limit=a.limit, tier=a.tier, has=a.has, skip=[t for t in a.skip.split(",") if t])
+            found = w.next(limit=a.limit, tier=a.tier, has=a.has, skip=[t for t in a.skip.split(",") if t], unseen_only=a.unseen)
             for t in [t for t in a.skip.split(",") if t]:
                 w.skip(t)
             for t in found.get("tasks", []):
                 print(f"{t['task_id']}  {t['title']}\n  {t['prompt_head']}{' ...' if t.get('prompt_cut') else ''}\n")
             print("NEXT:", json.dumps({k: v for k, v in found["next"].items() if k in ("action", "reason", "retry_after_seconds", "why")}))
         elif a.cmd == "claim":
-            got = w.claim(a.task_id)
+            got = w.claim(a.task_id, auto_suffix=a.auto_suffix)
             if got.get("lease"):
                 t = got["lease"]
-                print(f"LEASE {t['task_id']} fence {t['fencing_token']} (saved). Expires {t.get('lease_expires_at') or t.get('expires_at') or 'in 15 minutes'}.\nTITLE: {t.get('title')}\nPROMPT: {t.get('prompt')}")
+                print(f"LEASE {t['task_id']} as {w.effective_id} fence {t['fencing_token']} (saved). Expires {t.get('lease_expires_at') or t.get('expires_at') or 'in 15 minutes'}.\nTITLE: {t.get('title')}\nPROMPT: {t.get('prompt')}")
                 for h in got.get("helpers", []):
                     print(f"HELPER [{h.get('type')}{'' if h.get('reviewed') else ', unreviewed'}{', license ' + h['license'] if h.get('license') else ''}] {h.get('id')}: {str(h.get('about'))[:200]}")
             else:
@@ -334,6 +450,17 @@ def main(argv=None):
                 return 2
         elif a.cmd == "find":
             show(w.find(" ".join(a.words), kinds=a.kinds))
+        elif a.cmd == "discover":
+            show(w.discover(words=" ".join(a.words) if a.words else None, category=a.category, unseen_only=a.unseen, limit=a.limit))
+        elif a.cmd == "frontier":
+            show(w.frontier(a.items, record=a.record, campaign=a.campaign))
+        elif a.cmd == "resume":
+            show(w.resume(campaign=a.campaign))
+        elif a.cmd == "checkpoint":
+            show(w.checkpoint(step_index=a.step, total_steps=a.total,
+                              completed_steps=[s for s in a.done.split(",") if s],
+                              pending_steps=[s for s in a.pending.split(",") if s],
+                              notes=a.notes))
         elif a.cmd == "helpers":
             found = w.find_helpers()
             for h in found.get("hits", []) + found.get("maybe", []):
@@ -351,8 +478,8 @@ def main(argv=None):
         elif a.cmd == "give-back":
             out = w.give_back(a.reason); print("GAVE BACK", out.get("task_id"), "NEXT:", json.dumps(out.get("next")))
         elif a.cmd == "submit":
-            ev = json.load(open(a.evaluations)) if a.evaluations else None
-            show(receipt(w.submit(a.summary, read_work(a.file), object_key=a.key, builds_on=[b for b in a.builds_on.split(",") if b], category=a.category, evaluations=ev)))
+            ev = json.load(open(a.evaluations, encoding="utf-8")) if a.evaluations else None
+            show(receipt(w.submit(a.summary, read_work(a.file), object_key=a.key, builds_on=[b for b in a.builds_on.split(",") if b], category=a.category, evaluations=ev, strict_contract=a.strict)))
         elif a.cmd == "run-once":
             def do_work(task):
                 r = subprocess.run(a.command, shell=True, input=json.dumps(task), capture_output=True, text=True, timeout=COMMAND_TIMEOUT)

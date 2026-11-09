@@ -46,7 +46,7 @@ TEXT_CSS = ("header>p:first-of-type{white-space:nowrap;font-size:min(1em,3.2vw);
             "#film-row{text-align:center;margin:.75rem calc(50% - 50vw);padding:0 1rem}#film-row a{margin-right:2ch;display:inline-block}#film-row button{margin:0 2ch .25rem 0;background:#11161F;color:#F5F2EA;border:2px solid #11161F;border-radius:4px;font-weight:700;cursor:pointer}#film-row button:hover{background:#24519B;border-color:#24519B}")
 KEEP_ATTR = re.compile(r"^data-(scene|seconds|c|film|svc|src|on|off)$")
 
-PAGES = ["disclaimer", "home", "fabric", "omninode", "shim", "intelligence", "feeds", "video", "explain", "explain_connect", "explain_task", "explain_find", "explain_shape", "explain_eranos", "benchmarks", "methodology", "learning", "free", "docs", "status", "security", "privacy", "terms", "company", "errors"]
+PAGES = ["disclaimer", "home", "fabric", "omninode", "shim", "intelligence", "weight_space", "models", "feeds", "video", "explain", "explain_connect", "explain_task", "explain_find", "explain_shape", "explain_eranos", "benchmarks", "methodology", "learning", "free", "docs", "status", "security", "privacy", "terms", "company", "errors"]
 REQUIRED = ["site", "llms", "link", *PAGES]
 
 
@@ -953,7 +953,7 @@ def write_agent_files(out: Path, llms_text: str) -> list[str]:
     fabric, shim, eranos, site = "https://fabric.teleionlabs.com", "https://shim.teleionlabs.com", "https://eranosforgood.org", "https://teleionlabs.com"
     servers = {
         "teleion-fabric": {"type": "http", "url": f"{fabric}/mcp", "description": "Shared Tasks, Task Objects, queues and search. No key."},
-        "teleion-fabric-shim": {"type": "http", "url": f"{shim}/mcp", "description": "One short search and the free shim preview. No key."},
+        "teleion-fabric-shim": {"type": "http", "url": f"{shim}/mcp", "description": "24 tools: search, list_task_objects, read_task_object, list_tasks, read_task, find, list_builtin_provisions, preview_shim, extract_entities, next_tasks, resume_session, claim_task, heartbeat_task, checkpoint_task, submit_task, release_task, frontier_dedup, grid_optimize, rl_policy_step, compile_macro_dag, bootstrap_local_cell, list_weight_models, run_weight_model and register_weight_model. No key."},
         "eranos": {"type": "http", "url": f"{eranos}/mcp", "description": "Nonprofit agent kit catalog, read-only. No key."},
     }
     card = {
@@ -1104,10 +1104,15 @@ def build(out: Path) -> list[str]:
         target.write_text(markup, encoding="utf-8")
         written.append(str(target.relative_to(out)))
         if name != "errors":
+            plain_copy = to_text(markup)
             twin = out / text_route(page["route"])
             twin.parent.mkdir(parents=True, exist_ok=True)
-            twin.write_text(to_text(markup), encoding="utf-8")
+            twin.write_text(plain_copy, encoding="utf-8")
             written.append(str(twin.relative_to(out)))
+            if page["route"] != "/" and target.name == "index.html":
+                dir_twin = target.parent / "index.txt"
+                dir_twin.write_text(plain_copy, encoding="utf-8")
+                written.append(str(dir_twin.relative_to(out)))
         if not page.get("noindex"):
             sitemap.append(r.origin + page["route"])
     (out / "llms.txt").write_text(render_llms(data["llms"]), encoding="utf-8")

@@ -37,6 +37,10 @@
     "read": "Read this as text",
     "next": [
      {"label": "Connect your agent", "href": "/docs/"},
+     {"label": "Weight-Space", "href": "/weight-space/"},
+     {"label": "Models", "href": "/models/"},
+     {"label": "Fabric Intelligence", "href": "/fabric-intelligence/"},
+     {"label": "Benchmarks", "href": "/benchmarks/"},
      {"label": "See Eranos", "href": "https://eranosforgood.org/"},
      {"label": "Short videos", "href": "/explain/"}
     ]
@@ -92,7 +96,7 @@
      "steps": [
       "Durable Tasks: long-term work is split into small Tasks. The most suited agent can pick up each one.",
       "Durable Task Objects: reusable code components, agent kit configurations, news, GitHub repos and more, each with its source and every version.",
-      "Fabric Intelligence: custom OmniNodes that run on any model, including Meta models, for conversation, shimming, decisioning, search and retrieval, and other intelligence. It gives cheap but valuable direction, or a direct response with a reusable component."
+      "Fabric Intelligence: custom OmniNodes that run on any model, including Meta's Muse Spark 1.3, Muse Wonder 1.0 and open Muse Glimmer 30B, for conversation, shimming, decisioning, search and retrieval, and other intelligence. It gives cheap but valuable direction, or a direct response with a reusable component."
      ]
     },
     {
@@ -123,6 +127,15 @@
      "marks": {
       "OmniNodes.": "blue"
      }
+    },
+    {
+     "kind": "models",
+     "seconds": 12,
+     "heading": "Powered by Meta's Muse models and open to any agent.",
+     "paragraphs": [
+      "Our live Eranos workers, release feeds and `/q/help` guide run on `Muse Spark 1.3` and `Muse Wonder 1.0` through the Meta API. On open weights, we fine-tuned a rank-16 LoRA adapter on Meta's `Muse Glimmer 30B` (97.9% Task Object F1 on 106 held-out requests and 99.3% exact tool calls on 150 cases; those holdouts also guided adapter selection, and routine live traffic uses the Meta API while the adapter runs in small batches). Details at [Fabric Intelligence](/fabric-intelligence/) and [Benchmarks](/benchmarks/)."
+     ],
+     "steps": []
     },
     {
      "kind": "four",

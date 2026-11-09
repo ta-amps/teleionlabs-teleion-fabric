@@ -119,6 +119,16 @@
      "No model, Muse Spark or Muse Wonder, what to hand over, a budget"
     ],
     [
+     "Adaptive effort and JSON floor on `/q/help`",
+     "Running on live",
+     "Picks `minimal`, `low` or `high` across all six Meta effort rungs and protects small `max_tokens` replies from thinking truncation"
+    ],
+    [
+     "Neuro-symbolic search gate",
+     "Tested only",
+     "Combines deterministic search features with Muse Glimmer 30B across 440 untouched held-out Tasks"
+    ],
+    [
      "Retraining from live work",
      "Next, not built",
      "Nothing has retrained from live work. A trigger queues a Task; nobody claims it"
@@ -1003,6 +1013,55 @@
    "notes": [
     "Then add 0.10 per checker with a key, or our own checker, up to 0.20, and 0.02 per evaluation from a name only, up to 0.06. Code: `deploy/cloudflare/public_read.js`, `confidenceOf`, in the shim repository.",
     "This is a rule, not a calibrated chance of being right. It says what happened to an object."
+   ]
+  },
+  {
+   "type": "prose",
+   "id": "effort-and-traces",
+   "heading": "Reasoning effort calibration and trace-learned selection",
+   "paragraphs": [
+    "Running on live (`/q/help` and `/q/chat`) and tested offline (November 8, 2026). Through the Meta API, `Muse Spark 1.3` and `Muse Wonder 1.0` accept six `reasoning_effort` levels (`minimal`, `low`, `medium`, `high`, `xhigh` and `max`). On simple questions, higher effort spends far more internal thinking tokens without improving accuracy, while callers passing small `max_tokens` caps on JSON routes can lose visible output if thinking uses the whole token budget.",
+    "On the live shim, `/q/help` and `/q/chat` now accept all six Meta levels plus `adaptive` and record `reasoning_tokens` in the call log, and `/q/help` applies a safe output floor when `max_tokens` is set (`320` tokens on `minimal`, `640` on `low` and above, bounded by the operator ceiling) so short JSON lookups finish cleanly. Separately, a small gate trained on 766 recorded training rows and 52 dev rows combines deterministic word and subword overlap with `Muse Glimmer 30B` picks."
+   ]
+  },
+  {
+   "type": "table",
+   "id": "effort-and-traces-results",
+   "heading": "November 8 effort and trace measurements",
+   "columns": [
+    "Test",
+    "Result",
+    "Conditions"
+   ],
+   "rows": [
+    [
+     "Trivial-question thinking tokens (`minimal` vs `max`)",
+     "`Muse Wonder 1.0`: 22.3 vs 200.3 mean thinking tokens (9.0x). `Muse Spark 1.3`: 53.7 vs 404.7 (7.5x)",
+     "5 runs at `minimal`, 2 at `low`, 5 at `max` across simple control prompts at temperature 1.0 (221 Meta API calls total, $0.85 spend)"
+    ],
+    [
+     "Flawed-premise pushback (`minimal` vs `max`)",
+     "6 of 6 pushed back at `minimal` on both `Muse Spark 1.3` and `Muse Wonder 1.0`; 5 of 6 and 3 of 6 at `max`",
+     "6 flawed technical premises at temperature 0.0 and `max_tokens=1,536`; on the 4 missed `max` runs, internal thinking used 1,534 tokens and exhausted the output budget before replying"
+    ],
+    [
+     "Small `max_tokens` JSON floor (`160` vs `640`, and live `320`)",
+     "0 of 4 valid JSON at `low` with `max_tokens=160` (158 thinking tokens, 2 visible); 3 of 4 at `minimal` with `640`; live `/q/help` probe with `adaptive` and `max_tokens=120` completed in 320 output tokens (162 thinking)",
+     "`Muse Spark 1.3` JSON prompts; live probe recorded on `shim.teleionlabs.com/q/help`"
+    ],
+    [
+     "Mixed 12-Task effort and reuse routing",
+     "`adaptive` + Task Object reuse cut thinking tokens 50.9 percent vs `max` (5,185 vs 10,561) and beat default `low` accuracy (10 of 12 vs 9 of 12; `max` reached 11 of 12)",
+     "12 mixed lookup, audit and multi-constraint Tasks on `Muse Spark 1.3` at temperature 0.0, using 9 model calls and 3 existing Task Object matches"
+    ],
+    [
+     "Neuro-symbolic search gate across 440 cold Tasks",
+     "355 of 440 right (80.68 percent), ahead of `Muse Glimmer 30B` alone (346 of 440, 78.64 percent) and plain code (320 of 440, 72.73 percent)",
+     "Tested only. Trained on 766 training rows and 52 dev rows; evaluated once on 337 held-out rows plus 103 fresh Tasks"
+    ]
+   ],
+   "notes": [
+    "Reproducible offline CPU notebook: [Overthinking Bench, trace calibration and pluggable substrates](https://www.kaggle.com/code/taylorsamarel/overthinking-bench-and-trace-effort-calibration)."
    ]
   },
   {

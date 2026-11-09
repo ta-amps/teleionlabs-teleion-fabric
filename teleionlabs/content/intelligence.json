@@ -1,8 +1,8 @@
 {
  "kind": "task_object",
  "id": "teleion.instructions/page.intelligence",
- "version": 1,
- "updated": "2026-11-04",
+ "version": 2,
+ "updated": "2026-11-09",
  "route": "/fabric-intelligence/",
  "output": "fabric-intelligence/index.html",
  "title": "Fabric Intelligence explained · Teleion Labs",
@@ -82,6 +82,16 @@
    "id": "more",
    "heading": "Keep reading",
    "items": [
+    {
+     "label": "Weight-space programming across model types",
+     "href": "/weight-space/",
+     "text": "Five-seed atomic Task graph phase transition, Memory-as-LoRA, trace pruning, symbolic skeletons and long-horizon results."
+    },
+    {
+     "label": "Weight-space model hub",
+     "href": "/models/",
+     "text": "Sixteen edge-hosted models across ten families, 24-d zero-drift Task embeddings, 144 portable runtime artifacts and downloadable .safetensors cartridges."
+    },
     {
      "label": "How Teleion Fabric learns",
      "href": "/docs/learning/",

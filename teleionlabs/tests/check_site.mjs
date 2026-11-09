@@ -18,7 +18,7 @@ const { chromium } = require(PLAYWRIGHT);
 const args = process.argv.slice(2);
 const opt = (name, dflt) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : dflt; };
 const BASE = opt("--base", "http://127.0.0.1:8799").replace(/\/$/, "");
-const PAGES = ["/", "/disclaimer/", "/fabric/", "/omninode/", "/shimming/", "/fabric-intelligence/", "/feeds/", "/video/", "/explain/", "/explain/connect/", "/explain/task/", "/explain/search-and-reuse/", "/explain/omninode-shape/", "/explain/eranos/", "/benchmarks/", "/benchmarks/methodology/", "/docs/learning/", "/free/", "/docs/", "/status/", "/security/", "/privacy/", "/terms/", "/company/"];
+const PAGES = ["/", "/disclaimer/", "/fabric/", "/omninode/", "/shimming/", "/fabric-intelligence/", "/weight-space/", "/models/", "/feeds/", "/video/", "/explain/", "/explain/connect/", "/explain/task/", "/explain/search-and-reuse/", "/explain/omninode-shape/", "/explain/eranos/", "/benchmarks/", "/benchmarks/methodology/", "/docs/learning/", "/free/", "/docs/", "/status/", "/security/", "/privacy/", "/terms/", "/company/"];
 const VIEWPORTS = [{ width: 1280, height: 720 }, { width: 390, height: 844 }];
 const PAPER = "rgb(245, 242, 234)";
 const failures = [];
@@ -62,7 +62,7 @@ for (const viewport of VIEWPORTS) for (const colorScheme of ["light", "dark"]) {
     for (const src of scripts) {
       if (new URL(src).origin !== new URL(BASE).origin) fail(where, `script from another site ${src}`);
       if (/film3d|three/.test(src)) fail(where, `3D code ${src}`);
-      if (/film/.test(src) && !((path === "/" || path === "/video/") && /\/assets\/home-film\.js$/.test(src))) fail(where, `film code on a text page ${src}`);
+      if (/film/.test(src) && !((path === "/" || path === "/video/" || path.startsWith("/explain/")) && /\/assets\/home-film\.js$/.test(src))) fail(where, `film code on a text page ${src}`);
     }
     if (path === "/") {
       await page.waitForTimeout(2500);
